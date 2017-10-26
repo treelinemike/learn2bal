@@ -20,16 +20,16 @@ l_cm = 0.0072;           % [m] distance from axle to CM of pendulum assy
 mp = 0.41;               % [kg] link plus motor   (5kg = 11lb)
 Ip = 4.94e-4;            % [kg*m^2] about pendulum CM
 
-r_wheel = 0.04;          % [m]
-Ic = 1.35e-4;            % [kg*m^2] about wheel assy CM
-mc = 0.2202;             % [kg]
+r_wheel = 0.04;                        % [m]
+Ic = 1.35e-4;                          % [kg*m^2] about wheel assy CM
+mc = 0.2202;                              % [kg]
 
 % other system parameters
-g = 9.81;                % [m/s^2] 9.81m/s^2 on surface of earth
-b = 0.08;                % [kg*m^2/s] damping constant
+g = 9.81;                              % [m/s^2] 9.81m/s^2 on surface of earth
+b = 0.08;                              % [kg*m^2/s] damping constant
 
 % initial conditions X0 = [x0 xdot0]'
-X0 = [0 0 85*pi/180 0]'; % [m m rad rad/s]'
+X0 = [0 0 85*pi/180 0]';               % [m m rad rad/s]'
 X = X0;
 
 % data storage
