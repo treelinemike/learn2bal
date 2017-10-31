@@ -36,11 +36,11 @@ for t = t0:dt:(tf-dt)
     % generate control input (if necessary)
     switch(sim_mode)
         case l2b_mode.drive
-            u = 0.5
+            u = 0.5;
             
             % switch to endo mode if we're going fast enough
             if( X(2) > sysParams.xdotCrit )
-                X = [ ]';
+%                 X = [ ]';
                 
                 
             end
