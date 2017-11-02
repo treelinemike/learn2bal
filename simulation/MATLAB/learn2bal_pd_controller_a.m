@@ -40,7 +40,7 @@ for t = t0:dt:(tf-dt)
             u = -0.1;
             
             % switch to endo mode if we're going fast enough
-            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit/3) )
+            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit/6) )
                 
                 % compute new state vector that conserves angular momentum
                 % about ground contact point during "collision" when brake
@@ -67,7 +67,7 @@ for t = t0:dt:(tf-dt)
             u = 0;
             
             % switch to wheelie mode when 
-            if( abs(X(3) - pi/2) < 5*pi/180 )
+            if( abs(X(3) - pi/2) < 40*pi/180 )
                 sim_mode = l2b_mode.wheelie;
             end
                 
