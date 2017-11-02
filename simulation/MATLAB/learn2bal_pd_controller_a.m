@@ -22,7 +22,7 @@ sim_mode = l2b_mode.drive;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
-tf = 5;                  % [s] simulation end time
+tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % data storage
@@ -40,7 +40,7 @@ for t = t0:dt:(tf-dt)
             u = -0.1;
             
             % switch to endo mode if we're going fast enough
-            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit/10) )
+            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit/3) )
                 
                 % compute new state vector that conserves angular momentum
                 % about ground contact point during "collision" when brake
@@ -55,7 +55,7 @@ for t = t0:dt:(tf-dt)
                 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(theta) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
                 C = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(theta));
                 theta_dot_1 = (A*theta_dot - B*x_dot)/(C);
-                X = [x theta_dot_1  theta theta_dot_1]'
+                X = [x -theta_dot_1*sysParams.r_wheel  theta theta_dot_1]'
                 
                 % start propigating state in endo mode
                 sim_mode = l2b_mode.endo;
@@ -66,21 +66,27 @@ for t = t0:dt:(tf-dt)
             % no control input in endo mode
             u = 0;
             
+            % switch to wheelie mode when 
+            if( abs(X(3) - pi/2) < 5*pi/180 )
+                sim_mode = l2b_mode.wheelie;
+            end
+                
         case l2b_mode.wheelie
             
             % generate control input
-            Kd_x = 7;        %1.5 7..... +0.8 ... negative??
-            Kp_theta = 5;   %5.0 10 .... +5.0 ... positive
-            Kd_theta = -0.5;   %-0.5 -2 .... -0.5 ... negative
-            u = Kd_x*(X(2)) + Kp_theta*((pi/2)-X(3)) + Kd_theta*(X(4));  %+ Ki_x*(x_int)
+            Kd_x      =  2.7;        %1.5 7..... +0.8 ... negative??
+            Kp_theta  =  1.8;   %5.0 10 .... +5.0 ... positive
+            Kd_theta  =  -0.5;   %-0.5 -2 .... -0.5 ... negative
+            u         =  Kd_x*(X(2)) + Kp_theta*((pi/2)-X(3)) + Kd_theta*(X(4));  %+ Ki_x*(x_int)
             
         otherwise
             error('Cannot simulate from mode: %s', sim_mode);
     end
     
     % apply torque limits
-    if ( abs(u) > 0.5 )
-        u = sign(u)*0.5;
+    % TODO: make torque limits velocity dependent
+    if ( abs(u) > 0.2 )
+        u = sign(u)*0.2;
     end
     
     % calculate timestep for ODE solving
@@ -155,7 +161,7 @@ set(gcf,'Position',[0029 1.378000e+02 1.446400e+03 0624]);
 hold on; grid on;
 
 
-for i = 1:5:size(data,2)
+for i = 1:10:size(data,2)
     
     % get current state
     x = data(1,i);
