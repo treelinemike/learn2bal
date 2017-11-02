@@ -1,6 +1,9 @@
 % restart
 close all; clear all; clc;
 
+% options
+doSaveFrames = 0;
+
 % initialize parameters
 sysParams.l_link       = 0.19;      % [m]
 sysParams.l_cm         = 0.0072;    % [m] distance from axle to CM of pendulum assy
@@ -66,11 +69,11 @@ for t = t0:dt:(tf-dt)
             % no control input in endo mode
             u = 0;
             
-            % switch to wheelie mode when 
+            % switch to wheelie mode when
             if( abs(X(3) - pi/2) < 40*pi/180 )
                 sim_mode = l2b_mode.wheelie;
             end
-                
+            
         case l2b_mode.wheelie
             
             % generate control input
@@ -159,9 +162,9 @@ ylabel('\bfTorque (Nm)');
 figure;
 set(gcf,'Position',[0029 1.378000e+02 1.446400e+03 0624]);
 hold on; grid on;
+frameCount = 1;
 
-
-for i = 1:10:size(data,2)
+for i = [1:20:size(data,2) size(data,2)]
     
     % get current state
     x = data(1,i);
@@ -200,5 +203,11 @@ for i = 1:10:size(data,2)
     set(gca,'YLim',[-0.25 0.3]);
     set(gca,'XLim',[-.6 0.6]);
     drawnow;
-    pause(0.01);
+    if(doSaveFrames)
+        saveas(gcf,sprintf('frame%03d.png',frameCount));
+        frameCount = frameCount + 1;
+    else
+        pause(0.01);
+    end
+    
 end
