@@ -29,6 +29,7 @@ dt = 0.001;              % [s] timestep size
 time = [t0];
 data = [X0];
 uData = [];  % u to appled between CURRENT timestep and NEXT timestep (last element will be zero)
+modeData = {};
 
 % run simulation
 for t = t0:dt:(tf-dt)
@@ -36,17 +37,34 @@ for t = t0:dt:(tf-dt)
     % generate control input (if necessary)
     switch(sim_mode)
         case l2b_mode.drive
-            u = 0.5;
+            u = -0.1;
             
             % switch to endo mode if we're going fast enough
-            if( X(2) > sysParams.xdotCrit )
-%                 X = [ ]';
+            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit/10) )
                 
+                % compute new state vector that conserves angular momentum
+                % about ground contact point during "collision" when brake
+                % is applied
+                X
+                x = X(1);
+                x_dot = X(2);
+                theta = X(3);
+                theta_dot = X(4);
+                
+                A = sysParams.Ip + sysParams.mp*(sysParams.l_cm^2+sysParams.r_wheel*sysParams.l_cm*sin(theta));
+                B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(theta) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
+                C = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(theta));
+                theta_dot_1 = (A*theta_dot - B*x_dot)/(C);
+                X = [x theta_dot_1  theta theta_dot_1]'
+                
+                % start propigating state in endo mode
+                sim_mode = l2b_mode.endo;
                 
             end
             
         case l2b_mode.endo
             % no control input in endo mode
+            u = 0;
             
         case l2b_mode.wheelie
             
@@ -76,6 +94,8 @@ for t = t0:dt:(tf-dt)
     time(end+1)   = T(end);
     data(:,end+1) = X; % note: discarding state values at intermediate timesteps calculated by ode45()
     uData(:,end+1) = u;
+    
+    modeData{end+1} = sim_mode;
     
     % break out of loop if crash
     if(sim_mode == l2b_mode.crash)
@@ -172,7 +192,7 @@ for i = 1:5:size(data,2)
     
     % adjut axis limits and delay
     set(gca,'YLim',[-0.25 0.3]);
-    set(gca,'XLim',[-.2 1.0]);
+    set(gca,'XLim',[-.6 0.6]);
     drawnow;
     pause(0.01);
 end
