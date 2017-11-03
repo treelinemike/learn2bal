@@ -59,6 +59,36 @@ plot( (abs(X_data(2,:))/sysParams.r_wheel)*(10/(2*pi))  ,abs(u_data))
 xlabel('\bfSpeed (rpm)');
 ylabel('\bfTorque (Nm)');
 
+%% overlay trajectory on phase portrait
+%%
+load('orbits.mat');
+figure;
+hold on; grid on;
+xlabel('\bfTheta [rad]');
+ylabel('\bfTheta dot [rad/s]');
+zlabel('\bfx dot [m/s]');
+
+plot3(-pi/2,0,0,'k.','MarkerSize',40);
+plot3(pi/2,0,0,'ko','MarkerSize',10,'LineWidth',4);
+
+for i = 1:2
+   if(i == 1)
+       data = orbits.wheelie;
+       plot_color = 'b';
+   else
+       data = orbits.endo;
+       plot_color = 'r';
+   end
+   
+   for j = 1:size(data,2)
+      this_X = data{j};
+      plot3(this_X(3,:),this_X(4,:),this_X(2,:),'Color',plot_color);
+   end
+   
+end
+
+plot3(X_data(3,:),X_data(4,:),X_data(2,:),'m-','LineWidth',2');
+
 %% animate results
 figure;
 set(gcf,'Position',[0029 1.378000e+02 1.446400e+03 0624]);
