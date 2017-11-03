@@ -15,18 +15,19 @@ sysParams.Ic           = 1.35e-4;   % [kg*m^2] about wheel assy CM
 sysParams.n_grooves_1  = 20;        % number of grooves on pulley attached to motor
 sysParams.n_grooves_2  = 20;        % number of grooves on pulley attached to wheels
 sysParams.g            = 9.81;      % [m/s^2] 9.81m/s^2 on surface of earth
-sysParams.theta0       = 30*pi/180; % [rad] angle between body and ground in drive mode
+sysParams.theta0       = 0*pi/180; % [rad] angle between body and ground in drive mode
 
 % calculate critical speed for entering endo mode to passively reach vertical
+theta_end = 85*pi/180;
 Icombined = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(sysParams.theta0));
 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.theta0) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
-omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(1-sin(sysParams.theta0))/Icombined);
+omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysParams.theta0))/Icombined);
 sysParams.xdotCrit = (Icombined*omega_post/B);       % [m/s]
 
 % initial conditions X0 = [x0 xdot0]'
 X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
 X = X0;
-sim_mode = l2b_mode.free;
+sim_mode = l2b_mode.drive;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
