@@ -8,7 +8,7 @@ doSaveFrames = 0;
 sysParams = learn2bal_get_params();
 
 % calculate critical speed for entering endo mode to passively reach vertical
-theta_end = 85*pi/180;
+theta_end = 80*pi/180;
 Icombined = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(sysParams.theta0));
 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.theta0) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
 omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysParams.theta0))/Icombined);
@@ -30,10 +30,8 @@ data = [X0];
 uData = [];  % u to appled between CURRENT timestep and NEXT timestep (last element will be zero)
 modeData = {};
 
-% compute initial total energy
-phi_dot = -X(2)/sysParams.r_wheel;
-v_pcm_sq = (X(2)^2 -2*X(4)*X(2)*sysParams.l_cm*sin(X(3)) + sysParams.l_cm^2*X(4)^2);
-Utotal = [0.5*sysParams.Ic*(phi_dot)^2; 0.5*sysParams.mc*X(2)^2; 0.5*sysParams.Ip*X(4)^2; 0.5*sysParams.mp*v_pcm_sq; sysParams.mp*9.81*sysParams.l_cm*sin(X(3))];
+% compute initial total energy in system
+Utotal = learn2bal_compute_energy(X,sysParams);
 
 % run simulation
 for t = t0:dt:(tf-dt)
@@ -69,8 +67,8 @@ for t = t0:dt:(tf-dt)
             % no control input in endo mode
             u = 0;
             
-            % switch to wheelie mode when
-            if( abs(X(3) - pi/2) < 5*pi/180 )
+            % switch to wheelie mode when (if) the pendulum reaches a target angle
+            if( abs(X(3) - pi/2) < 10*pi/180 )
                 sim_mode = l2b_mode.wheelie;
             end
             
@@ -110,10 +108,7 @@ for t = t0:dt:(tf-dt)
     modeData{end+1} = sim_mode;
     
     % compute and save total energy
-    phi_dot = -X(2)/sysParams.r_wheel;
-    v_pcm_sq = (X(2)^2 - 2*X(4)*X(2)*sysParams.l_cm*sin(X(3)) + sysParams.l_cm^2*X(4)^2);
-    Utotal(:,end+1) = [0.5*sysParams.Ic*(phi_dot)^2; 0.5*sysParams.mc*X(2)^2; 0.5*sysParams.Ip*X(4)^2; 0.5*sysParams.mp*v_pcm_sq; sysParams.mp*9.81*sysParams.l_cm*sin(X(3))];
-    
+    Utotal(:,end+1) = learn2bal_compute_energy(X,sysParams);
     
     % break out of loop if crash
     if(sim_mode == l2b_mode.crash)
