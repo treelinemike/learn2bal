@@ -1,6 +1,10 @@
 % restart
 close all; clear all; clc;
 
+% plotting options
+plotOpts.doSaveFrames = 0;
+plotOpts.showEveryN = 20;
+
 % initialize parameters
 sysParams = learn2bal_get_params();
 
@@ -73,6 +77,11 @@ for t = t0:dt:(tf-dt)
                 sim_mode = l2b_mode.wheelie;
             end
         
+        % ENDO FREE MODE: BRAKE APPLIED, WHEEL LOCKED TO PENDULUM, NO CONTROL TORQUE, NO CRASH PROTECTION
+        case l2b_mode.endo_free
+            % no control input in endo mode
+            u = 0;
+
         % WHEELIE MODE: ATTEMPT TO BALANCE PENDULUM
         case l2b_mode.wheelie
             
@@ -90,6 +99,7 @@ for t = t0:dt:(tf-dt)
         otherwise
             error('Cannot simulate from mode: %s', sim_mode);
     end
+    
     
     % propigate state, keeping only the final state returned by the ODE solver
     [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,[t t+dt]);
@@ -112,7 +122,7 @@ end
 
 % add null control input and mode data for last state (not transitioning from last state...)
 u_data(end+1)    = 0;
-mode_data{end} = sprintf("%s",l2b_mode.complete); % overwrite...
+mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
 
 % plot results
-learn2bal_plot(sysParams, time, X_data, u_data, mode_data, energy_data);
+learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, energy_data);

@@ -1,7 +1,4 @@
-function learn2bal_plot(sysParams, time, X_data, u_data, mode_data, energy_data)
-
-% options
-doSaveFrames = 0;
+function learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, energy_data)
 
 %% plot time series trajectories
 figure;
@@ -68,7 +65,7 @@ set(gcf,'Position',[0029 1.378000e+02 1.446400e+03 0624]);
 hold on; grid on;
 frameCount = 1;
 
-for i = [1:20:size(X_data,2) size(X_data,2)]
+for i = [1:plotOpts.showEveryN:size(X_data,2) size(X_data,2)]
     
     % get current state
     x = X_data(1,i);
@@ -106,7 +103,7 @@ for i = [1:20:size(X_data,2) size(X_data,2)]
     set(gca,'YLim',[-0.25 0.3]);
     set(gca,'XLim',[-.6 0.6]);
     drawnow;
-    if(doSaveFrames)
+    if(plotOpts.doSaveFrames)
         saveas(gcf,sprintf('frame%03d.png',frameCount));
         frameCount = frameCount + 1;
     else
