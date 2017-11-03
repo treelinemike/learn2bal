@@ -12,10 +12,8 @@ for i = 1:2
         sim_mode = l2b_mode.endo_free;
     end
     
-dtheta = 2*pi/8;
-thetas = -pi/2:pi/2;
-thetas(1) = thetas(1)*0.9;
-thetas(end) = thetas(end)*0.9;
+dtheta = 2*pi/10;
+thetas = -pi/2:3*pi/2;
 for theta0 = thetas
 % initial conditions X0 = [x0 xdot0]'
 X0 = [0 0 theta0  0]'; % [m m rad rad/s]'
