@@ -5,24 +5,14 @@ close all; clear all; clc;
 doSaveFrames = 0;
 
 % initialize parameters
-sysParams.l_link       = 0.19;      % [m]
-sysParams.l_cm         = 0.072;     % [m] distance from axle to CM of pendulum assy
-sysParams.mp           = 0.41;      % [kg] link plus motor   (5kg = 11lb)
-sysParams.Ip           = 4.94e-4;   % [kg*m^2] about pendulum CM
-sysParams.r_wheel      = 0.04;      % [m]
-sysParams.mc           = 0.2202;    % [kg]
-sysParams.Ic           = 1.35e-4;   % [kg*m^2] about wheel assy CM
-sysParams.n_grooves_1  = 20;        % number of grooves on pulley attached to motor
-sysParams.n_grooves_2  = 20;        % number of grooves on pulley attached to wheels
-sysParams.g            = 9.81;      % [m/s^2] 9.81m/s^2 on surface of earth
-sysParams.theta0       = 0*pi/180; % [rad] angle between body and ground in drive mode
+sysParams = learn2bal_get_params();
 
 % calculate critical speed for entering endo mode to passively reach vertical
 theta_end = 85*pi/180;
 Icombined = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(sysParams.theta0));
 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.theta0) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
 omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysParams.theta0))/Icombined);
-sysParams.xdotCrit = (Icombined*omega_post/B);       % [m/s]
+x_dot_crit = (Icombined*omega_post/B);       % [m/s]
 
 % initial conditions X0 = [x0 xdot0]'
 X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
@@ -54,7 +44,7 @@ for t = t0:dt:(tf-dt)
             u = -0.1;
             
             % switch to endo mode if we're going fast enough
-            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit*1.0) )
+            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > x_dot_crit*1.0) )
                 
                 % compute new state vector that conserves angular momentum
                 % about ground contact point during "collision" when brake
