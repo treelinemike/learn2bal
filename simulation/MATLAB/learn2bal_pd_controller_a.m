@@ -1,9 +1,6 @@
 % restart
 close all; clear all; clc;
 
-% options
-doSaveFrames = 0;
-
 % initialize parameters
 sysParams = learn2bal_get_params();
 
@@ -24,14 +21,15 @@ t0 = 0;                  % [s] simulation start time
 tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
-% data storage
-time = [t0];
-data = [X0];
-uData = [];  % control effort appled between CURRENT timestep and NEXT timestep (last element will be zero)
-modeData = {};
+% data storage: state at time t
+time        = t0;
+X_data      = X0;
+energy_data = learn2bal_compute_energy(X,sysParams);  % compute initial total energy in system
 
-% compute initial total energy in system
-Utotal = learn2bal_compute_energy(X,sysParams);
+% data storage: control effort and mode to transition from state at time t to state at time t+1
+% (last element of u_data will be null, last element of mode_data will be l2b_mode.complete)
+u_data      = [];
+mode_data   = {sprintf("%s",sim_mode)};
 
 % run simulation
 for t = t0:dt:(tf-dt)
@@ -42,8 +40,10 @@ for t = t0:dt:(tf-dt)
     theta = X(3);
     theta_dot = X(4);
    
-    % generate control input (if necessary)
+    % generate control input (if necessary) based on system mode
     switch(sim_mode)
+       
+        % DRIVE MODE: TORQUE DRIVES WHEEL, PENDULUM DOES NOT ROTATE
         case l2b_mode.drive
             u = -0.1;
             
@@ -51,8 +51,7 @@ for t = t0:dt:(tf-dt)
             if( (sign(x_dot) ~= sign(pi/4-theta)) && (abs(x_dot) > x_dot_crit*1.0) )
                 
                 % compute new state vector that conserves angular momentum
-                % about ground contact point during "collision" when brake
-                % is applied
+                % about ground contact point during "collision" when brake applied
                 A = sysParams.Ip + sysParams.mp*(sysParams.l_cm^2+sysParams.r_wheel*sysParams.l_cm*sin(theta));
                 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(theta) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
                 C = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(theta));
@@ -63,7 +62,8 @@ for t = t0:dt:(tf-dt)
                 sim_mode = l2b_mode.endo;
                 
             end
-            
+           
+        % ENDO MODE: BRAKE APPLIED, WHEEL LOCKED TO PENDULUM, NO CONTROL TORQUE
         case l2b_mode.endo
             % no control input in endo mode
             u = 0;
@@ -72,7 +72,8 @@ for t = t0:dt:(tf-dt)
             if( abs(theta - pi/2) < 10*pi/180 )
                 sim_mode = l2b_mode.wheelie;
             end
-            
+        
+        % WHEELIE MODE: ATTEMPT TO BALANCE PENDULUM
         case l2b_mode.wheelie
             
             % generate control input
@@ -80,141 +81,38 @@ for t = t0:dt:(tf-dt)
             Kp_theta  =  1.8;   %5.0 10 .... +5.0 ... positive
             Kd_theta  =  -1;   %-0.5 -2 .... -0.5 ... negative
             u         =  Kd_x*(x_dot) + Kp_theta*((pi/2)-theta) + Kd_theta*(theta_dot);  %+ Ki_x*(x_int)
-            
+        
+        % FREE MODE: UNFORCED MOTION (use to check energy balance)
         case l2b_mode.free
             u = 0;
-            
+        
+        % UNKOWN MODE: SHOULD NEVER GET HERE
         otherwise
             error('Cannot simulate from mode: %s', sim_mode);
     end
     
-    % calculate timestep for ODE solving
-    odeTime = [t t+dt];
-    
-    % propigate state
-    [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,odeTime);
+    % propigate state, keeping only the final state returned by the ODE solver
+    [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,[t t+dt]);
     X = X(end, :)';  % note: this step is necessary to keep state vector dimensions correct for next call to ode45()
     
     % store results from this timestep
-    time(end+1)   = T(end);
-    data(:,end+1) = X; % note: discarding state values at intermediate timesteps calculated by ode45()
-    uData(:,end+1) = u_applied;
-    modeData{end+1} = sim_mode;
-    Utotal(:,end+1) = learn2bal_compute_energy(X,sysParams);
+    time(end+1)      = T(end);
+    X_data(:,end+1)  = X;          % note: discarding state values at intermediate timesteps calculated by ode45()
+    u_data(:,end+1)  = u_applied;
+    mode_data{end+1} = sprintf("%s",sim_mode);  % this is the mode at the END of the simulated timestep; i.e. mode used for NEXT propigation
+    energy_data(:,end+1)  = learn2bal_compute_energy(X,sysParams);
     
-    % break out of loop if system crashes
+    % break out of loop if system crashes back to initial pendulum angle
+    % TODO: handle this collision and return to drive mode...
     if(sim_mode == l2b_mode.crash)
         warning('Crash condition detected');
         break
-    end
-    
+    end 
 end
-uData(end+1) = 0; % control effort appled between CURRENT timestep and NEXT timestep (last element will be zero)
 
+% add null control input and mode data for last state (not transitioning from last state...)
+u_data(end+1)    = 0;
+mode_data{end} = sprintf("%s",l2b_mode.complete); % overwrite...
 
-%% plot results
-figure;
-set(gcf,'Position',[3.218000e+02 4.660000e+01 8.248000e+02 7.376000e+02]);
-ax = subplot(5,1,1);
-hold on; grid on;
-plot(time,data(1,:),'b-','LineWidth',1.6);
-xlabel('\bfTime [s]','FontSize',12);
-ylabel('\bfPosition [m]','FontSize',12);
-title('\bfSimulation Results','FontSize',14);
-
-ax(end+1) = subplot(5,1,2);
-hold on; grid on;
-plot(time,data(2,:),'b-','LineWidth',1.6);
-xlabel('\bfTime [s]','FontSize',12);
-ylabel('\bfVelocity [m/s]','FontSize',12);
-
-ax(end+1) = subplot(5,1,3);
-hold on; grid on;
-plot(time,data(3,:)*180/pi,'b-','LineWidth',1.6);
-xlabel('\bfTime [s]','FontSize',12);
-ylabel('\bf\Theta [deg]','FontSize',12);
-
-ax(end+1) = subplot(5,1,4);
-hold on; grid on;
-plot(time,data(4,:)*180/pi,'b-','LineWidth',1.6);
-xlabel('\bfTime [s]','FontSize',12);
-ylabel('\bf\Theta dot [deg/s]','FontSize',12);
-
-ax(end+1) = subplot(5,1,5);
-hold on; grid on;
-plot(time,uData,'b-','LineWidth',1.6);
-xlabel('\bfTime [s]','FontSize',12);
-ylabel('\bfMotor Torque [Nm]','FontSize',12);
-
-linkaxes(ax,'x');
-
-%% show energy plot
-figure;
-set(gcf,'Position',[1.426000e+02 3.634000e+02 1.189600e+03 3.032000e+02]);
-hold on; grid on;
-
-plot(time,sum(Utotal),'r','LineWidth',3);
-plot(time,Utotal,'LineWidth',1.3);
-legend('Total','Wheel Rotational','Wheel Linear','Body Rotational','Body Linear','Potential','Location','SouthEast');
-xlabel('\bfTime [s]');
-ylabel('\bfEnergy [J]');
-title('\bfTotal Energy in System','FontSize',12);
-%%
-figure
-hold on; grid on;
-plot( (abs(data(2,:))/sysParams.r_wheel)*(10/(2*pi))  ,abs(uData))
-xlabel('\bfSpeed (rpm)');
-ylabel('\bfTorque (Nm)');
-
-%% visaulization
-figure;
-set(gcf,'Position',[0029 1.378000e+02 1.446400e+03 0624]);
-hold on; grid on;
-frameCount = 1;
-
-for i = [1:20:size(data,2) size(data,2)]
-    
-    % get current state
-    x = data(1,i);
-    x_dot = data(2,i);
-    theta = data(3,i);
-    theta_dot = data(4,i);
-    phi = -x/sysParams.r_wheel;   % [rad]
-    
-    % draw ground
-    hold off;
-    plot([-10 10],[0 0],'-','Color',[0 0.7 0]);
-    hold on; grid on;
-    
-    % draw wheel
-    for j = 1:4
-        gamma = ((j-1):0.01:j)*pi/2;
-        x_wheel = x+sysParams.r_wheel*cos(gamma + phi);
-        y_wheel = sysParams.r_wheel + sysParams.r_wheel*sin(gamma + phi);
-        
-        linecolor = 'r';
-        if(mod(j,2))
-            linecolor = 'k';
-        end
-        
-        plot(x_wheel,y_wheel,'-','Color',linecolor,'LineWidth',5);
-    end
-    
-    % draw pendulum
-    plot(x+[0 sysParams.l_link*cos(theta)],sysParams.r_wheel+[0 sysParams.l_link*sin(theta)],'b-','LineWidth',5);
-    
-    % draw center of wheel
-    plot(x,sysParams.r_wheel,'k.','MarkerSize',25);
-    
-    % adjut axis limits and delay
-    set(gca,'YLim',[-0.25 0.3]);
-    set(gca,'XLim',[-.6 0.6]);
-    drawnow;
-    if(doSaveFrames)
-        saveas(gcf,sprintf('frame%03d.png',frameCount));
-        frameCount = frameCount + 1;
-    else
-        pause(0.01);
-    end
-    
-end
+% plot results
+learn2bal_plot(sysParams, time, X_data, u_data, mode_data, energy_data);

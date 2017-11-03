@@ -1,7 +1,8 @@
 % returns:
-%   T = time vector
-%   X = state at each time in T
-%   u_applied = actual torque applied by motor (at motor shaft), after saturation
+%   T           time vector
+%   X           state at each time in T
+%   u_applied   actual torque applied by motor (at motor shaft), after saturation
+%   sim_mode      
 function [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,p,sim_mode,odeTime)  %(current time, state vector, control input, parameter struct, simulation mode (drive, endo, wheelie), time bounds for ODE solver)
 
 % retrieve acceleration via global variable
