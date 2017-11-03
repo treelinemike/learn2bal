@@ -10,7 +10,7 @@ sysParams = learn2bal_get_params();
 
 % calculate critical speed for entering endo mode to passively reach vertical
 theta_end = 80*pi/180;
-Icombined = sysParams.Ic + sysParams.Ip + (sys.Params.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(sysParams.theta0));
+Icombined = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(sysParams.theta0));
 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.theta0) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
 omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysParams.theta0))/Icombined);
 x_dot_crit = (Icombined*omega_post/B);       % [m/s]
