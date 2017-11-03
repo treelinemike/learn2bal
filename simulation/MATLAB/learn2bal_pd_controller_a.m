@@ -27,7 +27,7 @@ dt = 0.001;              % [s] timestep size
 % data storage
 time = [t0];
 data = [X0];
-uData = [];  % u to appled between CURRENT timestep and NEXT timestep (last element will be zero)
+uData = [];  % control effort appled between CURRENT timestep and NEXT timestep (last element will be zero)
 modeData = {};
 
 % compute initial total energy in system
@@ -36,22 +36,23 @@ Utotal = learn2bal_compute_energy(X,sysParams);
 % run simulation
 for t = t0:dt:(tf-dt)
     
+    % extract values from current state vector
+    x = X(1);
+    x_dot = X(2);
+    theta = X(3);
+    theta_dot = X(4);
+   
     % generate control input (if necessary)
     switch(sim_mode)
         case l2b_mode.drive
             u = -0.1;
             
             % switch to endo mode if we're going fast enough
-            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > x_dot_crit*1.0) )
+            if( (sign(x_dot) ~= sign(pi/4-theta)) && (abs(x_dot) > x_dot_crit*1.0) )
                 
                 % compute new state vector that conserves angular momentum
                 % about ground contact point during "collision" when brake
                 % is applied
-                x = X(1);
-                x_dot = X(2);
-                theta = X(3);
-                theta_dot = X(4);
-                
                 A = sysParams.Ip + sysParams.mp*(sysParams.l_cm^2+sysParams.r_wheel*sysParams.l_cm*sin(theta));
                 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(theta) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
                 C = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(theta));
@@ -68,7 +69,7 @@ for t = t0:dt:(tf-dt)
             u = 0;
             
             % switch to wheelie mode when (if) the pendulum reaches a target angle
-            if( abs(X(3) - pi/2) < 10*pi/180 )
+            if( abs(theta - pi/2) < 10*pi/180 )
                 sim_mode = l2b_mode.wheelie;
             end
             
@@ -78,7 +79,7 @@ for t = t0:dt:(tf-dt)
             Kd_x      =  2.7;        %1.5 7..... +0.8 ... negative??
             Kp_theta  =  1.8;   %5.0 10 .... +5.0 ... positive
             Kd_theta  =  -1;   %-0.5 -2 .... -0.5 ... negative
-            u         =  Kd_x*(X(2)) + Kp_theta*((pi/2)-X(3)) + Kd_theta*(X(4));  %+ Ki_x*(x_int)
+            u         =  Kd_x*(x_dot) + Kp_theta*((pi/2)-theta) + Kd_theta*(theta_dot);  %+ Ki_x*(x_int)
             
         case l2b_mode.free
             u = 0;
@@ -87,37 +88,28 @@ for t = t0:dt:(tf-dt)
             error('Cannot simulate from mode: %s', sim_mode);
     end
     
-    % apply torque limits
-    % TODO: make torque limits velocity dependent
-    if ( abs(u) > 0.2 )
-        u = sign(u)*0.2;
-    end
-    
     % calculate timestep for ODE solving
     odeTime = [t t+dt];
     
     % propigate state
-    [T, X, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,odeTime);
+    [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,odeTime);
     X = X(end, :)';  % note: this step is necessary to keep state vector dimensions correct for next call to ode45()
     
     % store results from this timestep
     time(end+1)   = T(end);
     data(:,end+1) = X; % note: discarding state values at intermediate timesteps calculated by ode45()
-    uData(:,end+1) = u;
-    
+    uData(:,end+1) = u_applied;
     modeData{end+1} = sim_mode;
-    
-    % compute and save total energy
     Utotal(:,end+1) = learn2bal_compute_energy(X,sysParams);
     
-    % break out of loop if crash
+    % break out of loop if system crashes
     if(sim_mode == l2b_mode.crash)
         warning('Crash condition detected');
         break
     end
     
 end
-uData(end+1) = 0; % u to appled between CURRENT timestep and NEXT timestep (last element will be zero)
+uData(end+1) = 0; % control effort appled between CURRENT timestep and NEXT timestep (last element will be zero)
 
 
 %% plot results
@@ -187,7 +179,6 @@ for i = [1:20:size(data,2) size(data,2)]
     x_dot = data(2,i);
     theta = data(3,i);
     theta_dot = data(4,i);
-    
     phi = -x/sysParams.r_wheel;   % [rad]
     
     % draw ground
