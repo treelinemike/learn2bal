@@ -3,7 +3,7 @@ close all; clear all; clc;
 
 % plotting options
 plotOpts.doSaveFrames = 0;
-plotOpts.showEveryN = 20;
+plotOpts.showEveryN = 50;
 
 % initialize parameters
 sysParams = learn2bal_get_params();
@@ -22,7 +22,7 @@ sim_mode = l2b_mode.drive;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
-tf = 2;                  % [s] simulation end time
+tf = 5;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % data storage: state at time t
@@ -43,10 +43,10 @@ for t = t0:dt:(tf-dt)
     x_dot = X(2);
     theta = X(3);
     theta_dot = X(4);
-   
+    
     % generate control input (if necessary) based on system mode
     switch(sim_mode)
-       
+        
         % DRIVE MODE: TORQUE DRIVES WHEEL, PENDULUM DOES NOT ROTATE
         case l2b_mode.drive
             u = -0.1;
@@ -66,8 +66,8 @@ for t = t0:dt:(tf-dt)
                 sim_mode = l2b_mode.endo;
                 
             end
-           
-        % ENDO MODE: BRAKE APPLIED, WHEEL LOCKED TO PENDULUM, NO CONTROL TORQUE
+            
+            % ENDO MODE: BRAKE APPLIED, WHEEL LOCKED TO PENDULUM, NO CONTROL TORQUE
         case l2b_mode.endo
             % no control input in endo mode
             u = 0;
@@ -76,13 +76,13 @@ for t = t0:dt:(tf-dt)
             if( abs(theta - pi/2) < 10*pi/180 )
                 sim_mode = l2b_mode.wheelie;
             end
-        
-        % ENDO FREE MODE: BRAKE APPLIED, WHEEL LOCKED TO PENDULUM, NO CONTROL TORQUE, NO CRASH PROTECTION
+            
+            % ENDO FREE MODE: BRAKE APPLIED, WHEEL LOCKED TO PENDULUM, NO CONTROL TORQUE, NO CRASH PROTECTION
         case l2b_mode.endo_free
             % no control input in endo mode
             u = 0;
-
-        % WHEELIE MODE: ATTEMPT TO BALANCE PENDULUM
+            
+            % WHEELIE MODE: ATTEMPT TO BALANCE PENDULUM
         case l2b_mode.wheelie
             
             % generate control input
@@ -90,16 +90,15 @@ for t = t0:dt:(tf-dt)
             Kp_theta  =  1.8;   %5.0 10 .... +5.0 ... positive
             Kd_theta  =  -1;   %-0.5 -2 .... -0.5 ... negative
             u         =  Kd_x*(x_dot) + Kp_theta*((pi/2)-theta) + Kd_theta*(theta_dot);  %+ Ki_x*(x_int)
-        
-        % FREE MODE: UNFORCED MOTION (use to check energy balance)
+            
+            % FREE MODE: UNFORCED MOTION (use to check energy balance)
         case l2b_mode.free
             u = 0;
-        
-        % UNKOWN MODE: SHOULD NEVER GET HERE
+            
+            % UNKOWN MODE: SHOULD NEVER GET HERE
         otherwise
             error('Cannot simulate from mode: %s', sim_mode);
     end
-    
     
     % propigate state, keeping only the final state returned by the ODE solver
     [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,[t t+dt]);
@@ -117,7 +116,7 @@ for t = t0:dt:(tf-dt)
     if(sim_mode == l2b_mode.crash)
         warning('Crash condition detected');
         break
-    end 
+    end
 end
 
 % add null control input and mode data for last state (not transitioning from last state...)
