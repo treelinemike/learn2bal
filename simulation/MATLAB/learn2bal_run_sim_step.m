@@ -15,13 +15,13 @@ switch (sim_mode)
         if( abs( g_x_ddot ) > abs(liftOffAcc) )
             sim_mode = l2b_mode.wheelie;
         end
-            
+        
     case l2b_mode.endo
         % simulate next step
         [T,X] = ode45(@(t,X) learn2bal_odefcn_endo(t,X,p),odeTime,X);
-
+        
         % switch to 'crash' mode if we hit our maximum angle on either side
-        theta = X(end,3);      
+        theta = X(end,3);
         if( abs((pi/2) - theta) > abs((pi/2) - p.theta0) )
             sim_mode = l2b_mode.crash;  % eventually model this collision and continue...
         end
@@ -31,11 +31,22 @@ switch (sim_mode)
         [T,X] = ode45(@(t,X) learn2bal_odefcn_wheelie(t,X,u,p),odeTime,X);
         
         % switch to 'crash' mode if we hit our maximum angle on either side
-        theta = X(end,3);      
+        theta = X(end,3);
         if( abs((pi/2) - theta) > abs((pi/2) - p.theta0) )
             sim_mode = l2b_mode.crash;  % eventually model this collision and continue...
         end
         
+    case l2b_mode.free
+        % simulate next step
+        u = 0;
+        [T,X] = ode45(@(t,X) learn2bal_odefcn_wheelie(t,X,u,p),odeTime,X);
+        %
+        %         % switch to 'crash' mode if we hit our maximum angle on either side
+        %         theta = X(end,3);
+        %         if( abs((pi/2) - theta) > abs((pi/2) - p.theta0) )
+        %             sim_mode = l2b_mode.crash;  % eventually model this collision and continue...
+        %         end
+        %
     otherwise
         error('Cannot simulate from mode: %s', sim_mode);
         

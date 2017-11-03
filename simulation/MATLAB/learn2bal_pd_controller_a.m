@@ -6,22 +6,27 @@ doSaveFrames = 0;
 
 % initialize parameters
 sysParams.l_link       = 0.19;      % [m]
-sysParams.l_cm         = 0.0072;    % [m] distance from axle to CM of pendulum assy
+sysParams.l_cm         = 0.072;     % [m] distance from axle to CM of pendulum assy
 sysParams.mp           = 0.41;      % [kg] link plus motor   (5kg = 11lb)
 sysParams.Ip           = 4.94e-4;   % [kg*m^2] about pendulum CM
 sysParams.r_wheel      = 0.04;      % [m]
-sysParams.Ic           = 1.35e-4;   % [kg*m^2] about wheel assy CM
 sysParams.mc           = 0.2202;    % [kg]
+sysParams.Ic           = 1.35e-4;   % [kg*m^2] about wheel assy CM
 sysParams.n_grooves_1  = 20;        % number of grooves on pulley attached to motor
 sysParams.n_grooves_2  = 20;        % number of grooves on pulley attached to wheels
 sysParams.g            = 9.81;      % [m/s^2] 9.81m/s^2 on surface of earth
 sysParams.theta0       = 30*pi/180; % [rad] angle between body and ground in drive mode
-sysParams.xdotCrit     = 1.2;       % [m/s] critical velocity to stand (computed in Excel)
+
+% calculate critical speed for entering endo mode to passively reach vertical
+Icombined = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(sysParams.theta0));
+B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.theta0) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
+omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(1-sin(sysParams.theta0))/Icombined);
+sysParams.xdotCrit = (Icombined*omega_post/B);       % [m/s]
 
 % initial conditions X0 = [x0 xdot0]'
 X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
 X = X0;
-sim_mode = l2b_mode.drive;
+sim_mode = l2b_mode.free;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
@@ -34,6 +39,11 @@ data = [X0];
 uData = [];  % u to appled between CURRENT timestep and NEXT timestep (last element will be zero)
 modeData = {};
 
+% compute initial total energy
+phi_dot = -X(2)/sysParams.r_wheel;
+v_pcm_sq = (X(2)^2 -2*X(4)*X(2)*sysParams.l_cm*sin(X(3)) + sysParams.l_cm^2*X(4)^2);
+Utotal = [0.5*sysParams.Ic*(phi_dot)^2; 0.5*sysParams.mc*X(2)^2; 0.5*sysParams.Ip*X(4)^2; 0.5*sysParams.mp*v_pcm_sq; sysParams.mp*9.81*sysParams.l_cm*sin(X(3))];
+
 % run simulation
 for t = t0:dt:(tf-dt)
     
@@ -43,12 +53,11 @@ for t = t0:dt:(tf-dt)
             u = -0.1;
             
             % switch to endo mode if we're going fast enough
-            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit/6) )
+            if( (sign(X(2)) ~= sign(pi/4-X(3))) & (abs(X(2)) > sysParams.xdotCrit*1.0) )
                 
                 % compute new state vector that conserves angular momentum
                 % about ground contact point during "collision" when brake
                 % is applied
-                X
                 x = X(1);
                 x_dot = X(2);
                 theta = X(3);
@@ -58,7 +67,7 @@ for t = t0:dt:(tf-dt)
                 B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(theta) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
                 C = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(theta));
                 theta_dot_1 = (A*theta_dot - B*x_dot)/(C);
-                X = [x -theta_dot_1*sysParams.r_wheel  theta theta_dot_1]'
+                X = [x -theta_dot_1*sysParams.r_wheel  theta theta_dot_1]';
                 
                 % start propigating state in endo mode
                 sim_mode = l2b_mode.endo;
@@ -70,7 +79,7 @@ for t = t0:dt:(tf-dt)
             u = 0;
             
             % switch to wheelie mode when
-            if( abs(X(3) - pi/2) < 40*pi/180 )
+            if( abs(X(3) - pi/2) < 5*pi/180 )
                 sim_mode = l2b_mode.wheelie;
             end
             
@@ -79,8 +88,11 @@ for t = t0:dt:(tf-dt)
             % generate control input
             Kd_x      =  2.7;        %1.5 7..... +0.8 ... negative??
             Kp_theta  =  1.8;   %5.0 10 .... +5.0 ... positive
-            Kd_theta  =  -0.5;   %-0.5 -2 .... -0.5 ... negative
+            Kd_theta  =  -1;   %-0.5 -2 .... -0.5 ... negative
             u         =  Kd_x*(X(2)) + Kp_theta*((pi/2)-X(3)) + Kd_theta*(X(4));  %+ Ki_x*(x_int)
+            
+        case l2b_mode.free
+            u = 0;
             
         otherwise
             error('Cannot simulate from mode: %s', sim_mode);
@@ -105,6 +117,12 @@ for t = t0:dt:(tf-dt)
     uData(:,end+1) = u;
     
     modeData{end+1} = sim_mode;
+    
+    % compute and save total energy
+    phi_dot = -X(2)/sysParams.r_wheel;
+    v_pcm_sq = (X(2)^2 - 2*X(4)*X(2)*sysParams.l_cm*sin(X(3)) + sysParams.l_cm^2*X(4)^2);
+    Utotal(:,end+1) = [0.5*sysParams.Ic*(phi_dot)^2; 0.5*sysParams.mc*X(2)^2; 0.5*sysParams.Ip*X(4)^2; 0.5*sysParams.mp*v_pcm_sq; sysParams.mp*9.81*sysParams.l_cm*sin(X(3))];
+    
     
     % break out of loop if crash
     if(sim_mode == l2b_mode.crash)
@@ -152,6 +170,17 @@ ylabel('\bfMotor Torque [Nm]','FontSize',12);
 
 linkaxes(ax,'x');
 
+%% show energy plot
+figure;
+set(gcf,'Position',[1.426000e+02 3.634000e+02 1.189600e+03 3.032000e+02]);
+hold on; grid on;
+
+plot(time,sum(Utotal),'r','LineWidth',3);
+plot(time,Utotal,'LineWidth',1.3);
+legend('Total','Wheel Rotational','Wheel Linear','Body Rotational','Body Linear','Potential','Location','SouthEast');
+xlabel('\bfTime [s]');
+ylabel('\bfEnergy [J]');
+title('\bfTotal Energy in System','FontSize',12);
 %%
 figure
 hold on; grid on;
