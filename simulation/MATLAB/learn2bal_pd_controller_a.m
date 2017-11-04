@@ -22,7 +22,7 @@ sim_mode = l2b_mode.drive;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
-tf = 5;                  % [s] simulation end time
+tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % data storage: state at time t
@@ -88,7 +88,7 @@ for t = t0:dt:(tf-dt)
             % generate control input
             Kd_x      =  2.7;        %1.5 7..... +0.8 ... negative??
             Kp_theta  =  1.8;   %5.0 10 .... +5.0 ... positive
-            Kd_theta  =  -1;   %-0.5 -2 .... -0.5 ... negative
+            Kd_theta  =  -0.25;   %-0.5 -2 .... -0.5 ... negative
             u         =  Kd_x*(x_dot) + Kp_theta*((pi/2)-theta) + Kd_theta*(theta_dot);  %+ Ki_x*(x_int)
             
             % FREE MODE: UNFORCED MOTION (use to check energy balance)
