@@ -15,14 +15,18 @@ title('\bfSimulation Results','FontSize',14);
 ax(end+1) = subplot(5,1,2);
 hold on; grid on;
 plot(time,X_data(2,:),'b-','LineWidth',1.6);
-plot(time,discX(3,:),'r-','LineWidth',1.6);
+if(~isempty(discX))
+    plot(time,discX(3,:),'r-','LineWidth',1.6);
+end
 xlabel('\bfTime [s]','FontSize',12);
 ylabel('\bfVelocity [m/s]','FontSize',12);
 
 ax(end+1) = subplot(5,1,3);
 hold on; grid on;
 plot(time,X_data(3,:)*180/pi,'b-','LineWidth',1.6);
-plot(time,discX(1,:)*180/pi,'r-','LineWidth',1.6);
+if(~isempty(discX))
+    plot(time,discX(1,:)*180/pi,'r-','LineWidth',1.6);
+end
 xlabel('\bfTime [s]','FontSize',12);
 ylabel('\bf\Theta [deg]','FontSize',12);
 
@@ -30,7 +34,9 @@ ylabel('\bf\Theta [deg]','FontSize',12);
 ax(end+1) = subplot(5,1,4);
 hold on; grid on;
 plot(time,X_data(4,:)*180/pi,'b-','LineWidth',1.6);
-plot(time,discX(2,:)*180/pi,'r-','LineWidth',1.6);
+if(~isempty(discX))
+    plot(time,discX(2,:)*180/pi,'r-','LineWidth',1.6);
+end
 xlabel('\bfTime [s]','FontSize',12);
 ylabel('\bf\Theta dot [deg/s]','FontSize',12);
 
@@ -78,19 +84,19 @@ plot3(-pi/2,0,0,'k.','MarkerSize',40);
 plot3(pi/2,0,0,'ko','MarkerSize',10,'LineWidth',4);
 
 for i = 1:2
-   if(i == 1)
-       data = orbits.wheelie;
-       plot_color = 'b';
-   else
-       data = orbits.endo;
-       plot_color = 'r';
-   end
-   
-   for j = 1:size(data,2)
-      this_X = data{j};
-      plot3(this_X(3,:),this_X(4,:),this_X(2,:),'Color',plot_color);
-   end
-   
+    if(i == 1)
+        data = orbits.wheelie;
+        plot_color = 'b';
+    else
+        data = orbits.endo;
+        plot_color = 'r';
+    end
+    
+    for j = 1:size(data,2)
+        this_X = data{j};
+        plot3(this_X(3,:),this_X(4,:),this_X(2,:),'Color',plot_color);
+    end
+    
 end
 
 plot3(X_data(3,:),X_data(4,:),X_data(2,:),'m-','LineWidth',2');

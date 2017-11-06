@@ -3,7 +3,7 @@ close all; clear all; clc;
 
 % plotting options
 plotOpts.doSaveFrames = 0;
-plotOpts.showEveryN = 10;
+plotOpts.showEveryN = 15;
 
 % initialize parameters
 sysParams = learn2bal_get_params();
