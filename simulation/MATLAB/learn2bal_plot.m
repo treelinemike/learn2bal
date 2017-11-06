@@ -1,5 +1,7 @@
 function learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, energy_data)
 
+global discX; % TODO: remove
+
 %% plot time series trajectories
 figure;
 set(gcf,'Position',[3.218000e+02 4.660000e+01 8.248000e+02 7.376000e+02]);
@@ -13,18 +15,22 @@ title('\bfSimulation Results','FontSize',14);
 ax(end+1) = subplot(5,1,2);
 hold on; grid on;
 plot(time,X_data(2,:),'b-','LineWidth',1.6);
+plot(time,discX(3,:),'r-','LineWidth',1.6);
 xlabel('\bfTime [s]','FontSize',12);
 ylabel('\bfVelocity [m/s]','FontSize',12);
 
 ax(end+1) = subplot(5,1,3);
 hold on; grid on;
 plot(time,X_data(3,:)*180/pi,'b-','LineWidth',1.6);
+plot(time,discX(1,:)*180/pi,'r-','LineWidth',1.6);
 xlabel('\bfTime [s]','FontSize',12);
 ylabel('\bf\Theta [deg]','FontSize',12);
+
 
 ax(end+1) = subplot(5,1,4);
 hold on; grid on;
 plot(time,X_data(4,:)*180/pi,'b-','LineWidth',1.6);
+plot(time,discX(2,:)*180/pi,'r-','LineWidth',1.6);
 xlabel('\bfTime [s]','FontSize',12);
 ylabel('\bf\Theta dot [deg/s]','FontSize',12);
 
