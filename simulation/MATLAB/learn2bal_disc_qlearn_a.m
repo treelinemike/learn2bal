@@ -5,7 +5,7 @@ global discX; % share discrete state history with plotting function; TODO remove
 
 % plotting options
 plotOpts.doSaveFrames = 0;
-plotOpts.showEveryN = 0;
+plotOpts.showEveryN = 1;
 
 % initialize parameters
 sysParams = learn2bal_get_params();
@@ -17,20 +17,16 @@ B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.
 omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysParams.theta0))/Icombined);
 x_dot_crit = (Icombined*omega_post/B);       % [m/s]
 
-% initial conditions X0 = [x0 xdot0]'
-X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
-X = X0;
-sim_mode = l2b_mode.drive;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
 tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
-% data storage: state at time t
-time        = t0;
-X_data      = X0;
-energy_data = learn2bal_compute_energy(X,sysParams);  % compute initial total energy in system
+% learning parameters
+epsilon = 0.05;   % exploration vs. exploitation control
+alpha = 0.1;      % learning rate
+gamma = 0.2;      % discount factor
 
 % state discritization
 discStateValsX = [0:1:180]*pi/180;      % [rad]
@@ -42,98 +38,137 @@ nz = length(discStateValsZ);
 
 % action discritization
 uMax = 0.2;
-discActionVals = [-1 -0.5 -0.25 -0.125 0 0.125 0.25 0.5 1]*uMax;
+discActionVals = [-1 0 1]*uMax;
 
 % Q table
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
 Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
-% data storage for discrete state info
-[stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
-discStateN = stateNum;
-discX = dStates;
 
-% learning parameters
-epsilon = 0.2;   % exploration vs. exploitation control
-alpha = 0.01;    % learning rate
-gamma = 0.2;     % discount factor
-
-% data storage: control effort and mode to transition from state at time t to state at time t+1
-% (last element of u_data will be null, last element of mode_data will be l2b_mode.complete)
-u_data      = [];
-mode_data   = {sprintf("%s",sim_mode)};
-
-% run simulation
-for t = t0:dt:(tf-dt)
+for i = 1:1000
     
-    % extract values from current state vector
-    x = X(1);
-    x_dot = X(2);
-    theta = X(3);
-    theta_dot = X(4);
+    % discount epsilon
+    epsilon = 0.999*epsilon;
     
-    [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
-    actionCosts = Q(stateNum,:)
-    % take an action
-    if( unifrnd(0,1) < epsilon)
-        [~,aIdx] = min(actionCosts);
-    else
-        % choose an action at random
-        aIdx = unidrnd(length(actionCosts));
-    end
+    % initial conditions X0 = [x0 xdot0]'
+    X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
+    X = X0;
+    sim_mode = l2b_mode.drive;
     
-    if(aIdx == length(actionCosts))
-        % compute new state vector that conserves angular momentum
-        % about ground contact point during "collision" when brake applied
-        A = sysParams.Ip + sysParams.mp*(sysParams.l_cm^2+sysParams.r_wheel*sysParams.l_cm*sin(theta));
-        B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(theta) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
-        C = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(theta));
-        theta_dot_1 = (A*theta_dot - B*x_dot)/(C);
-        X = [x -theta_dot_1*sysParams.r_wheel  theta theta_dot_1]';
-        
-        % start propigating state in endo mode
-        sim_mode = l2b_mode.endo;
-        u = 0;
-    else
-        u = discActionVals(aIdx);
-    end
-    
-    % propigate state, keeping only the final state returned by the ODE solver
-    [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,[t t+dt]);
-    X_prime = X(end, :)';  % note: this step is necessary to keep state vector dimensions correct for next call to ode45()
-    
-    % get reward
-    
-    % update Q function
-    Q(stateNum,aIdx) = Q(stateNum,aIdx) + 
-    
-    X = X_prime;
-    
-    % store results from this timestep
-    time(end+1)      = T(end);
-    X_data(:,end+1)  = X;          % note: discarding state values at intermediate timesteps calculated by ode45()
-    u_data(:,end+1)  = u_applied;
-    mode_data{end+1} = sprintf("%s",sim_mode);  % this is the mode at the END of the simulated timestep; i.e. mode used for NEXT propigation
-    energy_data(:,end+1)  = learn2bal_compute_energy(X,sysParams);
+    % data storage: state at time t
+    time        = t0;
+    X_data      = X0;
+    energy_data = learn2bal_compute_energy(X,sysParams);  % compute initial total energy in system
     
     % data storage for discrete state info
     [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
-    discStateN(end+1) = stateNum;
-    discX(:,end+1) = dStates;
+    discStateN = stateNum;
+    discX = dStates;
     
-    % determine and store discrete state information
+    % data storage: control effort and mode to transition from state at time t to state at time t+1
+    % (last element of u_data will be null, last element of mode_data will be l2b_mode.complete)
+    u_data      = [];
+    mode_data   = {sprintf("%s",sim_mode)};
     
-    % break out of loop if system crashes back to initial pendulum angle
-    % TODO: handle this collision and return to drive mode...
-    if(sim_mode == l2b_mode.crash)
-        warning('Crash condition detected');
-        break
+    % run simulation
+    for t = t0:dt:(tf-dt)
+        
+        % extract values from current state vector
+        x = X(1);
+        x_dot = X(2);
+        theta = X(3);
+        theta_dot = X(4);
+        
+        [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
+        actionCosts = Q(stateNum,:);
+        % take an action
+        if( unifrnd(0,1) > epsilon)
+            % EXPLOIT
+            [~,aIdx] = min(actionCosts);
+        else
+            % EXPLORE
+            % choose an action at random
+            aIdx = unidrnd(length(actionCosts));
+        end
+        
+        if(aIdx == length(actionCosts))
+            % LOCK WHEEL TO BODY
+            % compute new state vector that conserves angular momentum
+            % about ground contact point during "collision" when brake applied
+            A = sysParams.Ip + sysParams.mp*(sysParams.l_cm^2+sysParams.r_wheel*sysParams.l_cm*sin(theta));
+            B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(theta) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
+            C = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(theta));
+            theta_dot_1 = (A*theta_dot - B*x_dot)/(C);
+            X = [x -theta_dot_1*sysParams.r_wheel  theta theta_dot_1]';
+            
+            % start propigating state in endo mode
+            sim_mode = l2b_mode.endo;
+            u = 0;
+        else
+            if(sim_mode == l2b_mode.endo)
+                sim_mode = l2b_mode.wheelie;
+            end
+            u = discActionVals(aIdx);
+        end
+        
+        % propigate state, keeping only the final state returned by the ODE solver
+        [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,[t t+dt]);
+        X_prime = X(end, :)';  % note: this step is necessary to keep state vector dimensions correct for next call to ode45()
+        
+        % get reward
+        
+        % update Q function
+        [stateNum_prime,idxVec_prime,dStates_prime] = learn2bal_get_disc_state(X_prime,discStateValsX,discStateValsY,discStateValsZ);
+        
+        
+        if( sim_mode == l2b_mode.drive)
+            x_eff = X_prime(2:end,:) - [-2 X0(3) 0]';
+            c = x_eff' * [100 0 0; 0 0   0; 0 0 0] * x_eff + u'*[0]*u;
+        else
+            x_eff = X_prime(2:end,:) - [0 pi/2 0]';
+            c = x_eff' * [0 0 0; 0 100  0; 0 0 0] * x_eff + u'*[0]*u;
+        end
+        
+        % penalize crashing
+        if(sim_mode == l2b_mode.crash)
+            c = 10000;
+        end
+        
+        % penalize changing action
+        if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
+            c = c + 100;
+        end
+        
+        Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(min(Q(stateNum_prime,:))));
+        
+        X = X_prime;
+        
+        % store results from this timestep
+        time(end+1)      = T(end);
+        X_data(:,end+1)  = X;          % note: discarding state values at intermediate timesteps calculated by ode45()
+        u_data(:,end+1)  = u_applied;
+        mode_data{end+1} = sprintf("%s",sim_mode);  % this is the mode at the END of the simulated timestep; i.e. mode used for NEXT propigation
+        energy_data(:,end+1)  = learn2bal_compute_energy(X,sysParams);
+        
+        % data storage for discrete state info
+        [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
+        discStateN(end+1) = stateNum;
+        discX(:,end+1) = dStates;
+        
+        % determine and store discrete state information
+        
+        % break out of loop if system crashes back to initial pendulum angle
+        % TODO: handle this collision and return to drive mode...
+        if(sim_mode == l2b_mode.crash)
+            %warning('Crash condition detected');
+            break
+        end
     end
+    
+    % add null control input and mode data for last state (not transitioning from last state...)
+    u_data(end+1)    = 0;
+    mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
+%     time(end) 
 end
-
-% add null control input and mode data for last state (not transitioning from last state...)
-u_data(end+1)    = 0;
-mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
-
 % plot results
 learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, energy_data);
