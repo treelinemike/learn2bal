@@ -22,7 +22,7 @@ sim_mode = l2b_mode.drive;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
-tf = 2;                  % [s] simulation end time
+tf = 1.2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % data storage: state at time t

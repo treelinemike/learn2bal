@@ -99,12 +99,16 @@ for i = 1:2
     
 end
 
-plot3(X_data(3,:),X_data(4,:),X_data(2,:),'m-','LineWidth',2');
+plot3(X_data(3,:),X_data(4,:),X_data(2,:),'-','LineWidth',3','Color',[ 0 0.7 0]);
 
 %% animate results
 figure;
 set(gcf,'Position',[0029 1.378000e+02 1.446400e+03 0624]);
+% set(gcf,'Position',[0029 4.546000e+02 8.144000e+02 3.072000e+02]);
 hold on; grid on;
+
+
+
 frameCount = 1;
 
 for i = [1:plotOpts.showEveryN:size(X_data,2) size(X_data,2)]
@@ -118,8 +122,15 @@ for i = [1:plotOpts.showEveryN:size(X_data,2) size(X_data,2)]
     
     % draw ground
     hold off;
-    plot([-10 10],[0 0],'-','Color',[0 0.7 0]);
+    plot([-10 10],[0 0],'-','Color',[0 0.7 0],'LineWidth',2.0);
     hold on; grid on;
+    
+    if(plotOpts.doSaveFrames && frameCount == 1)
+        grid on;
+        set(gca,'YLim',[-0.025 0.25]);
+        set(gca,'XLim',[-.5 0.2]);
+        saveas(gcf,sprintf('frame0.png',frameCount));
+    end
     
     % draw wheel
     for j = 1:4
@@ -141,11 +152,17 @@ for i = [1:plotOpts.showEveryN:size(X_data,2) size(X_data,2)]
     % draw center of wheel
     plot(x,sysParams.r_wheel,'k.','MarkerSize',25);
     
-    % adjut axis limits and delay
+    % adjut axis limits
     set(gca,'YLim',[-0.25 0.3]);
     set(gca,'XLim',[-.6 0.6]);
+%     set(gca,'YLim',[-0.025 0.25]);
+%     set(gca,'XLim',[-.5 0.2]);
+    
+    
+    % draw plot and delay
     drawnow;
     if(plotOpts.doSaveFrames)
+        grid off;
         saveas(gcf,sprintf('frame%03d.png',frameCount));
         frameCount = frameCount + 1;
     else

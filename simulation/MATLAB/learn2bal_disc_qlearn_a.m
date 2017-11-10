@@ -24,7 +24,8 @@ tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % learning parameters
-epsilon = 0.05;   % exploration vs. exploitation control
+epsilon = 0.2;   % exploration vs. exploitation control  % may want to make higher (0.9) then reduce to a minimum 
+% adjacency trace (
 alpha = 0.1;      % learning rate
 gamma = 0.2;      % discount factor
 
@@ -45,15 +46,15 @@ discActionVals = [-1 0 1]*uMax;
 Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 
-for i = 1:1000
+for i = 1:100
     
     % discount epsilon
     epsilon = 0.999*epsilon;
     
     % initial conditions X0 = [x0 xdot0]'
-    X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
+    X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]'
     X = X0;
-    sim_mode = l2b_mode.drive;
+    sim_mode = l2b_mode.wheelie;
     
     % data storage: state at time t
     time        = t0;
@@ -82,14 +83,14 @@ for i = 1:1000
         [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
         actionCosts = Q(stateNum,:);
         % take an action
-        if( unifrnd(0,1) > epsilon)
+%         if( unifrnd(0,1) > epsilon)
             % EXPLOIT
             [~,aIdx] = min(actionCosts);
-        else
-            % EXPLORE
-            % choose an action at random
-            aIdx = unidrnd(length(actionCosts));
-        end
+%         else
+%             % EXPLORE
+%             % choose an action at random
+%             aIdx = unidrnd(length(actionCosts));
+%         end
         
         if(aIdx == length(actionCosts))
             % LOCK WHEEL TO BODY
@@ -117,17 +118,11 @@ for i = 1:1000
         
         % get reward
         
-        % update Q function
+        
         [stateNum_prime,idxVec_prime,dStates_prime] = learn2bal_get_disc_state(X_prime,discStateValsX,discStateValsY,discStateValsZ);
         
-        
-        if( sim_mode == l2b_mode.drive)
-            x_eff = X_prime(2:end,:) - [-2 X0(3) 0]';
-            c = x_eff' * [100 0 0; 0 0   0; 0 0 0] * x_eff + u'*[0]*u;
-        else
-            x_eff = X_prime(2:end,:) - [0 pi/2 0]';
-            c = x_eff' * [0 0 0; 0 100  0; 0 0 0] * x_eff + u'*[0]*u;
-        end
+        x_eff = X_prime(2:end,:) - [0 pi/2 0]';
+        c = x_eff' * [100 0 0; 0 100 0; 0 0 100] * x_eff + u'*[0]*u;
         
         % penalize crashing
         if(sim_mode == l2b_mode.crash)
@@ -136,9 +131,10 @@ for i = 1:1000
         
         % penalize changing action
         if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
-            c = c + 100;
+            c = c + 1000;
         end
         
+        % update Q table
         Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(min(Q(stateNum_prime,:))));
         
         X = X_prime;
@@ -168,7 +164,7 @@ for i = 1:1000
     % add null control input and mode data for last state (not transitioning from last state...)
     u_data(end+1)    = 0;
     mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
-%     time(end) 
+     time(end) 
 end
 % plot results
 learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, energy_data);
