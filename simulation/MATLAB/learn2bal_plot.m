@@ -83,6 +83,8 @@ zlabel('\bfx dot [m/s]');
 plot3(-pi/2,0,0,'k.','MarkerSize',40);
 plot3(pi/2,0,0,'ko','MarkerSize',10,'LineWidth',4);
 
+legPlots = [];
+
 for i = 1:2
     if(i == 1)
         data = orbits.wheelie;
@@ -94,12 +96,16 @@ for i = 1:2
     
     for j = 1:size(data,2)
         this_X = data{j};
-        plot3(this_X(3,:),this_X(4,:),this_X(2,:),'Color',plot_color);
+        ph = plot3(this_X(3,:),this_X(4,:),this_X(2,:),'Color',plot_color);
+        if(j == 1)
+            legPlots(end+1) = ph;
+        end
     end
     
 end
 
-plot3(X_data(3,:),X_data(4,:),X_data(2,:),'-','LineWidth',3','Color',[ 0 0.7 0]);
+legPlots(end+1) = plot3(X_data(3,:),X_data(4,:),X_data(2,:),'-','LineWidth',3','Color',[ 0 0.7 0]);
+legend(legPlots,{'Wheelie Orbits','Endo Orbits','Manual Controller'});
 
 %% animate results
 figure;

@@ -30,8 +30,8 @@ alpha = 0.1;      % learning rate
 gamma = 0.2;      % discount factor
 
 % state discritization
-discStateValsX = [0:1:180]*pi/180;      % [rad]
-discStateValsY = [-1600:50:1600]*pi/180;   % [rad/s]
+discStateValsX = [0:5:180]*pi/180;      % [rad]
+discStateValsY = [-1600:160:1600]*pi/180;   % [rad/s]
 discStateValsZ = [-20:0.25:20];            % [m/s]
 nx = length(discStateValsX);
 ny = length(discStateValsY);
@@ -45,11 +45,13 @@ discActionVals = [-1 0 1]*uMax;
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
 Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
+exploitExplore = [];
+
 
 for i = 1:100
     
     % discount epsilon
-    epsilon = 0.999*epsilon;
+    epsilon = 0.99*epsilon;
     
     % initial conditions X0 = [x0 xdot0]'
     X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]'
@@ -75,6 +77,7 @@ for i = 1:100
     for t = t0:dt:(tf-dt)
         
         % extract values from current state vector
+        X_current = X;
         x = X(1);
         x_dot = X(2);
         theta = X(3);
@@ -82,15 +85,18 @@ for i = 1:100
         
         [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
         actionCosts = Q(stateNum,:);
+        
         % take an action
-%         if( unifrnd(0,1) > epsilon)
-            % EXPLOIT
+        if( unifrnd(0,1) > epsilon)
+%             EXPLOIT
+            exploitExplore(end+1) = 1;
             [~,aIdx] = min(actionCosts);
-%         else
-%             % EXPLORE
-%             % choose an action at random
-%             aIdx = unidrnd(length(actionCosts));
-%         end
+        else
+            % EXPLORE
+            % choose an action at random
+                        exploitExplore(end+1) = 2;
+            aIdx = unidrnd(length(actionCosts));
+        end
         
         if(aIdx == length(actionCosts))
             % LOCK WHEEL TO BODY
@@ -121,8 +127,8 @@ for i = 1:100
         
         [stateNum_prime,idxVec_prime,dStates_prime] = learn2bal_get_disc_state(X_prime,discStateValsX,discStateValsY,discStateValsZ);
         
-        x_eff = X_prime(2:end,:) - [0 pi/2 0]';
-        c = x_eff' * [100 0 0; 0 100 0; 0 0 100] * x_eff + u'*[0]*u;
+        x_eff = X_current(2:end,:) - [0 pi/2 0]';
+        c = x_eff' * [100 0 0; 0 1000 0; 0 0 100] * x_eff + u'*[0]*u;
         
         % penalize crashing
         if(sim_mode == l2b_mode.crash)
@@ -164,7 +170,7 @@ for i = 1:100
     % add null control input and mode data for last state (not transitioning from last state...)
     u_data(end+1)    = 0;
     mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
-     time(end) 
+%      time(end) 
 end
 % plot results
-learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, energy_data);
+learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, []);
