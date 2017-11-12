@@ -30,9 +30,9 @@ alpha = 0.1;      % learning rate
 gamma = 0.2;      % discount factor
 
 % state discritization
-discStateValsX = [0:5:180]*pi/180;      % [rad]
-discStateValsY = [-1600:160:1600]*pi/180;   % [rad/s]
-discStateValsZ = [-20:0.25:20];            % [m/s]
+discStateValsX = [0:9:180]*pi/180;         % [rad]
+discStateValsY = [-200:20:200]*pi/180;   % [rad/s]
+discStateValsZ = [-4:0.5:4];             % [m/s]
 nx = length(discStateValsX);
 ny = length(discStateValsY);
 nz = length(discStateValsZ);
@@ -41,14 +41,14 @@ nz = length(discStateValsZ);
 uMax = 0.2;
 discActionVals = [-1 0 1]*uMax;
 
-% Q table
+% initialzie Q table randomly
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
 Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 exploitExplore = [];
 
 
-for i = 1:100
+for i = 1:200
     
     % discount epsilon
     epsilon = 0.99*epsilon;
@@ -83,21 +83,26 @@ for i = 1:100
         theta = X(3);
         theta_dot = X(4);
         
+        % determine index of current state
         [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
+        
+        % get cost of each actions from current state
+        % as given by the current Q table
         actionCosts = Q(stateNum,:);
         
-        % take an action
+        % determine which action to take from here
         if( unifrnd(0,1) > epsilon)
-%             EXPLOIT
+            % EXPLOIT
             exploitExplore(end+1) = 1;
             [~,aIdx] = min(actionCosts);
         else
             % EXPLORE
             % choose an action at random
-                        exploitExplore(end+1) = 2;
+            exploitExplore(end+1) = 2;
             aIdx = unidrnd(length(actionCosts));
         end
         
+        % compute appropriate control action
         if(aIdx == length(actionCosts))
             % LOCK WHEEL TO BODY
             % compute new state vector that conserves angular momentum
@@ -122,28 +127,29 @@ for i = 1:100
         [T, X, u_applied, sim_mode] = learn2bal_run_sim_step(t,X,u,sysParams,sim_mode,[t t+dt]);
         X_prime = X(end, :)';  % note: this step is necessary to keep state vector dimensions correct for next call to ode45()
         
-        % get reward
-        
-        
+        % get index of new state
         [stateNum_prime,idxVec_prime,dStates_prime] = learn2bal_get_disc_state(X_prime,discStateValsX,discStateValsY,discStateValsZ);
         
-        x_eff = X_current(2:end,:) - [0 pi/2 0]';
-        c = x_eff' * [100 0 0; 0 1000 0; 0 0 100] * x_eff + u'*[0]*u;
-        
-        % penalize crashing
-        if(sim_mode == l2b_mode.crash)
-            c = 10000;
+%         x_eff = X_current(2:end,:) - [0 pi/2 0]';
+%         c = x_eff' * [100 0 0; 0 1000 0; 0 0 100] * x_eff + u'*[0]*u;
+        c= 0;
+        % penalize being in crashed state
+        if( abs(pi/2 - X_current(3)) > 10*pi/180)
+            c = 100;
         end
         
         % penalize changing action
         if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
-            c = c + 1000;
+            c = c + 10;
         end
         
         % update Q table
         Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(min(Q(stateNum_prime,:))));
         
+        % update state 
         X = X_prime;
+        dStates = dStates_prime;
+        stateNum = stateNum_prime;
         
         % store results from this timestep
         time(end+1)      = T(end);
@@ -153,7 +159,6 @@ for i = 1:100
         energy_data(:,end+1)  = learn2bal_compute_energy(X,sysParams);
         
         % data storage for discrete state info
-        [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
         discStateN(end+1) = stateNum;
         discX(:,end+1) = dStates;
         
