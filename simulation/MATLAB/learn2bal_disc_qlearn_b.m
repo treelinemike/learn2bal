@@ -47,7 +47,7 @@ discActionVals = [-1 0 1]*uMax;
 
 % initialzie Q table randomly
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
-%Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
+Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 exploitExplore = [];
 
@@ -141,9 +141,15 @@ for i = 1:nTrainTrials
 %         x_eff = X_current(2:end,:) - [0 pi/2 0]';
 %         c = x_eff' * [100 0 0; 0 1000 0; 0 0 100] * x_eff + u'*[0]*u;
         c= 0;
-        % penalize being in crashed state
+        
+        % penalize being away from top
         if( abs(pi/2 - X_current(3)) > 10*pi/180)
             c = 100;
+        end
+        
+        % penalize wheel velocity
+        if( abs(X_current(2)) > 0.1)
+            c = 20;
         end
         
         % penalize changing action

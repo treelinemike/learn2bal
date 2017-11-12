@@ -15,7 +15,7 @@ B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.
 omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysParams.theta0))/Icombined);
 x_dot_crit = (Icombined*omega_post/B);       % [m/s]
 
-% initial conditions X0 = [x0 xdot0]'
+% initial conditions X0 = [x0 xdot0 theta0 thetadot0]'
 X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
 X = X0;
 sim_mode = l2b_mode.drive;

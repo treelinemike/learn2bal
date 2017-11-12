@@ -1,7 +1,10 @@
 % restart
-close all; clear all; clc;
+close all; clc; % clear all;
 
 global discX; % share discrete state history with plotting function; TODO remove this, it is a hack
+
+% number of training trials
+nTrainTrials = 1000;
 
 % plotting options
 plotOpts.doSaveFrames = 0;
@@ -16,7 +19,7 @@ tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % learning parameters
-epsilon = 0.2;   % exploration vs. exploitation control  % may want to make higher (0.9) then reduce to a minimum 
+epsilon = 0.2;   % exploration vs. exploitation control  % may want to make higher (0.9) then reduce to a minimum
 % adjacency trace (
 alpha = 0.1;      % learning rate
 gamma = 0.2;      % discount factor
@@ -35,15 +38,20 @@ discActionVals = [-1 0 1]*uMax;
 
 % initialzie Q table randomly
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
-Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
+% Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 exploitExplore = [];
 
 
-for i = 1:500
+for i = 1:nTrainTrials
     
     % discount epsilon
     epsilon = 0.995*epsilon;
+    
+    % set epsilon to zero (greedy policy)
+    if(i == nTrainTrials)
+        epsilon = 0;
+    end
     
     % initial conditions X0 = [x0 xdot0]'
     X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]'
@@ -122,13 +130,19 @@ for i = 1:500
         % get index of new state
         [stateNum_prime,idxVec_prime,dStates_prime] = learn2bal_get_disc_state(X_prime,discStateValsX,discStateValsY,discStateValsZ);
         
-%         x_eff = X_current(2:end,:) - [0 pi/2 0]';
-%         c = x_eff' * [100 0 0; 0 1000 0; 0 0 100] * x_eff + u'*[0]*u;
+        %         x_eff = X_current(2:end,:) - [0 pi/2 0]';
+        %         c = x_eff' * [100 0 0; 0 1000 0; 0 0 100] * x_eff + u'*[0]*u;
         c= 0;
-        % penalize being in crashed state
+        
+        % penalize being away from top
         if( abs(pi/2 - X_current(3)) > 10*pi/180)
             c = 100;
         end
+        
+%         % penalize wheel velocity
+%         if( abs(X_current(2)) > 0.1)
+%             c = 10;
+%         end
         
         % penalize changing action
         if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
@@ -138,7 +152,7 @@ for i = 1:500
         % update Q table
         Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(min(Q(stateNum_prime,:))));
         
-        % update state 
+        % update state
         X = X_prime;
         dStates = dStates_prime;
         stateNum = stateNum_prime;
@@ -167,7 +181,7 @@ for i = 1:500
     % add null control input and mode data for last state (not transitioning from last state...)
     u_data(end+1)    = 0;
     mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
-%      time(end) 
+    %      time(end)
 end
 % plot results
 learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, []);
