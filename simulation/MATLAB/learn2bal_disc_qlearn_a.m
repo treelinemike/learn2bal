@@ -48,10 +48,10 @@ Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 exploitExplore = [];
 
 
-for i = 1:200
+for i = 1:500
     
     % discount epsilon
-    epsilon = 0.99*epsilon;
+    epsilon = 0.995*epsilon;
     
     % initial conditions X0 = [x0 xdot0]'
     X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]'
