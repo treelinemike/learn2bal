@@ -1,14 +1,26 @@
+
 % restart
-close all; clear all; clc;
+close all; clc;
 
 global discX; % share discrete state history with plotting function; TODO remove this, it is a hack
 
+% number of training trials
+nTrainTrials = 1000;
+
 % plotting options
 plotOpts.doSaveFrames = 0;
-plotOpts.showEveryN = 15;
+plotOpts.showEveryN = 20;
 
 % initialize parameters
 sysParams = learn2bal_get_params();
+
+% calculate critical speed for entering endo mode to passively reach vertical
+theta_end = 80*pi/180;
+Icombined = sysParams.Ic + sysParams.Ip + (sysParams.mc + sysParams.mp)*sysParams.r_wheel^2 + sysParams.mp*(sysParams.l_cm^2 + 2*sysParams.r_wheel*sysParams.l_cm*sin(sysParams.theta0));
+B = (sysParams.Ic/sysParams.r_wheel + sysParams.mp*sysParams.l_cm*sin(sysParams.theta0) + (sysParams.mc+sysParams.mp)*sysParams.r_wheel);
+omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysParams.theta0))/Icombined);
+x_dot_crit = (Icombined*omega_post/B);       % [m/s]
+
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
@@ -35,18 +47,22 @@ discActionVals = [-1 0 1]*uMax;
 
 % initialzie Q table randomly
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
-Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
+%Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 exploitExplore = [];
 
 
-for i = 1:500
+for i = 1:nTrainTrials
     
     % discount epsilon
     epsilon = 0.995*epsilon;
     
     % initial conditions X0 = [x0 xdot0]'
-    X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]'
+    if(i == nTrainTrials)
+        X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]';
+    else
+        X0 = [0;mvnrnd([0, pi/2, 0]',[2/1.96 0 0; 0 (pi/2)/1.96 0; 0 0 200*pi/(180*1.96)])'];
+    end
     X = X0;
     sim_mode = l2b_mode.wheelie;
     
