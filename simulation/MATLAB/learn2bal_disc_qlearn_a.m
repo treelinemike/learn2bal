@@ -9,7 +9,7 @@ close all; clc; clear all;
 global discX; % share discrete state history with plotting function; TODO remove this, it is a hack
 
 % number of training trials
-nTrainTrials = 500;
+nTrainTrials = 1000;
 
 % plotting options
 plotOpts.doSaveFrames = 0;
@@ -20,19 +20,19 @@ sysParams = learn2bal_get_params();
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
-tf = 2;                  % [s] simulation end time
+tf = 1;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % learning parameters
 epsilon = 0.2;   % exploration vs. exploitation control  % may want to make higher (0.9) then reduce to a minimum
-% adjacency trace (
-alpha = 0.1;      % learning rate
-gamma = 0.2;      % discount factor
+% adjacency trace ???
+alpha = 0.35;      % learning rate
+gamma = 0.5;      % discount factor
 
 % state discritization
-discStateValsX = [0:9:180]*pi/180;         % [rad]
+discStateValsX = [0:1:180]*pi/180;       % [rad]
 discStateValsY = [-200:20:200]*pi/180;   % [rad/s]
-discStateValsZ = [-4:0.5:4];             % [m/s]
+discStateValsZ = [-1:0.1:1];             % [m/s]
 nx = length(discStateValsX);
 ny = length(discStateValsY);
 nz = length(discStateValsZ);
@@ -42,8 +42,8 @@ uMax = 0.2;
 discActionVals = [-1 0 1]*uMax;
 
 % initialzie Q table randomly
-%Q = zeros(nx*ny*nz,length(discActionVals)+1);
-Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
+Q = zeros(nx*ny*nz,length(discActionVals)+1);
+% Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 exploitExplore = [];
 
@@ -51,12 +51,23 @@ exploitExplore = [];
 for i = 1:nTrainTrials
     
     % discount epsilon
-    epsilon = 0.99*epsilon;
+    epsilon = 0.995*epsilon;
     
     % set epsilon to zero (greedy policy)
     if(i == nTrainTrials)
         epsilon = 0;
     end
+    
+    
+    % initial conditions
+    if(i == nTrainTrials)
+        X0 = [0 0 80*pi/180 0]'; % [m m/s rad rad/s]';
+    else
+        X0 = [0; 0; (80+(randn()*10/1.96))*pi/180; 0];
+    end
+    X = X0;
+    sim_mode = l2b_mode.wheelie;
+    
     
     % initial conditions X0 = [x0 xdot0]'
     X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]'
@@ -76,7 +87,7 @@ for i = 1:nTrainTrials
     % data storage: control effort and mode to transition from state at time t to state at time t+1
     % (last element of u_data will be null, last element of mode_data will be l2b_mode.complete)
     u_data      = [];
-    mode_data   = {sprintf("%s",sim_mode)};
+    mode_data   = {str2mat(sprintf("%s",sim_mode))};
     
     % run simulation
     for t = t0:dt:(tf-dt)
@@ -93,22 +104,22 @@ for i = 1:nTrainTrials
         
         % get cost of each actions from current state
         % as given by the current Q table
-        actionCosts = Q(stateNum,:);
+        actionRewards = Q(stateNum,:);
         
         % determine which action to take from here
         if( unifrnd(0,1) > epsilon)
             % EXPLOIT
             exploitExplore(end+1) = 1;
-            [~,aIdx] = min(actionCosts);
+            [~,aIdx] = max(actionRewards);
         else
             % EXPLORE
             % choose an action at random
             exploitExplore(end+1) = 2;
-            aIdx = unidrnd(length(actionCosts));
+            aIdx = unidrnd(length(actionRewards)  -1  );  % NOTE: NOT ALLOWING SELECTION OF BRAKE LOCK!!!
         end
         
         % compute appropriate control action
-        if(aIdx == length(actionCosts))
+        if(aIdx == length(actionRewards))
             % LOCK WHEEL TO BODY
             % compute new state vector that conserves angular momentum
             % about ground contact point during "collision" when brake applied
@@ -141,17 +152,23 @@ for i = 1:nTrainTrials
         
         % penalize being away from top
         if( abs(pi/2 - X_current(3)) > 10*pi/180)
-            c = 100;
+            c = -500;
+        end
+        
+        % penalize locking brakes
+        if(aIdx == 4)
+            c = c - 100;
         end
         
 %         % penalize wheel velocity
 %         if( abs(X_current(2)) > 0.1)
-%             c = 10;
+%             c = -10;
 %         end
         
         % penalize changing action
+        % comparison here doesn't work!!
         if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
-            c = c + 10;
+            c = c - 10;
         end
         
         % update Q table
@@ -185,24 +202,32 @@ for i = 1:nTrainTrials
     
     % add null control input and mode data for last state (not transitioning from last state...)
     u_data(end+1)    = 0;
-    mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
+    mode_data{end}   = str2mat(sprintf("%s",l2b_mode.complete)); % overwrite...
     %      time(end)
 end
+
+Q(discStateN(1:10),:)
 
 % plot results
 learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, []);
 
 %% plot policy
 figure
-[~,policyVec] = min(Q,[],2);
+[~,policyVec] = max(Q,[],2);
 idxX = repmat(discStateValsX',length(discStateValsY)*length(discStateValsZ),1)*180/pi;
 idxY = repmat(  repelem(discStateValsY',length(discStateValsX),1) , length(discStateValsZ), 1)*180/pi;
 idxZ = repelem(discStateValsZ',length(discStateValsX)*length(discStateValsY),1);
 stateIdx = [idxX, idxY, idxZ];
-scatter3(idxX,idxY,idxZ,100,policyVec,'filled')
+scatter3(idxX,idxY,idxZ,50,policyVec,'filled')
 xlabel('Body Angle [deg]');
 ylabel('Body Angular velocity [deg/s]');
 zlabel('Horizontal Speed [m/s]');
 colorbar
-set(gca,'ZLim',[-0.01 0.01])
+hold on;
+plot3([90 90],[-220 220],[0.1 0.1],'r-','LineWidth',3);
+set(gca,'ZLim',[0.01 0.11])
 view([0 90])
+
+
+% save Q
+save('Q001.mat','Q')
