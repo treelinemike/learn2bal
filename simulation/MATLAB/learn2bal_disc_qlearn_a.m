@@ -30,7 +30,7 @@ alpha = 0.1;      % learning rate
 gamma = 0.2;      % discount factor
 
 % state discritization
-discStateValsX = [0:18:180]*pi/180;         % [rad]
+discStateValsX = [0:9:180]*pi/180;         % [rad]
 discStateValsY = [-200:20:200]*pi/180;   % [rad/s]
 discStateValsZ = [-4:0.5:4];             % [m/s]
 nx = length(discStateValsX);
@@ -51,7 +51,7 @@ exploitExplore = [];
 for i = 1:nTrainTrials
     
     % discount epsilon
-    epsilon = 0.999*epsilon;
+    epsilon = 0.99*epsilon;
     
     % set epsilon to zero (greedy policy)
     if(i == nTrainTrials)
@@ -199,8 +199,10 @@ idxX = repmat(discStateValsX',length(discStateValsY)*length(discStateValsZ),1)*1
 idxY = repmat(  repelem(discStateValsY',length(discStateValsX),1) , length(discStateValsZ), 1)*180/pi;
 idxZ = repelem(discStateValsZ',length(discStateValsX)*length(discStateValsY),1);
 stateIdx = [idxX, idxY, idxZ];
-scatter3(idxX,idxY,idxZ,[],policyVec,'filled')
+scatter3(idxX,idxY,idxZ,100,policyVec,'filled')
 xlabel('Body Angle [deg]');
 ylabel('Body Angular velocity [deg/s]');
 zlabel('Horizontal Speed [m/s]');
 colorbar
+set(gca,'ZLim',[-0.01 0.01])
+view([0 90])
