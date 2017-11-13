@@ -1,10 +1,15 @@
+% TODO:
+% - display mode traces vs. time
+% - visualize greedy actions in state space with switching surfaces
+% - save and recall policies
+
 % restart
-close all; clc; % clear all;
+close all; clc; clear all;
 
 global discX; % share discrete state history with plotting function; TODO remove this, it is a hack
 
 % number of training trials
-nTrainTrials = 1000;
+nTrainTrials = 500;
 
 % plotting options
 plotOpts.doSaveFrames = 0;
@@ -25,7 +30,7 @@ alpha = 0.1;      % learning rate
 gamma = 0.2;      % discount factor
 
 % state discritization
-discStateValsX = [0:9:180]*pi/180;         % [rad]
+discStateValsX = [0:18:180]*pi/180;         % [rad]
 discStateValsY = [-200:20:200]*pi/180;   % [rad/s]
 discStateValsZ = [-4:0.5:4];             % [m/s]
 nx = length(discStateValsX);
@@ -38,7 +43,7 @@ discActionVals = [-1 0 1]*uMax;
 
 % initialzie Q table randomly
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
-% Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
+Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 exploitExplore = [];
 
@@ -46,7 +51,7 @@ exploitExplore = [];
 for i = 1:nTrainTrials
     
     % discount epsilon
-    epsilon = 0.995*epsilon;
+    epsilon = 0.999*epsilon;
     
     % set epsilon to zero (greedy policy)
     if(i == nTrainTrials)
@@ -183,5 +188,19 @@ for i = 1:nTrainTrials
     mode_data{end}   = sprintf("%s",l2b_mode.complete); % overwrite...
     %      time(end)
 end
+
 % plot results
 learn2bal_plot(plotOpts, sysParams, time, X_data, u_data, mode_data, []);
+
+%% plot policy
+figure
+[~,policyVec] = min(Q,[],2);
+idxX = repmat(discStateValsX',length(discStateValsY)*length(discStateValsZ),1)*180/pi;
+idxY = repmat(  repelem(discStateValsY',length(discStateValsX),1) , length(discStateValsZ), 1)*180/pi;
+idxZ = repelem(discStateValsZ',length(discStateValsX)*length(discStateValsY),1);
+stateIdx = [idxX, idxY, idxZ];
+scatter3(idxX,idxY,idxZ,[],policyVec,'filled')
+xlabel('Body Angle [deg]');
+ylabel('Body Angular velocity [deg/s]');
+zlabel('Horizontal Speed [m/s]');
+colorbar
