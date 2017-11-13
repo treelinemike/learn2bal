@@ -9,7 +9,7 @@ close all; clc; clear all;
 global discX; % share discrete state history with plotting function; TODO remove this, it is a hack
 
 % number of training trials
-nTrainTrials = 1000;
+nTrainTrials = 5000;
 
 % plotting options
 plotOpts.doSaveFrames = 0;
@@ -26,13 +26,13 @@ dt = 0.001;              % [s] timestep size
 % learning parameters
 epsilon = 0.2;   % exploration vs. exploitation control  % may want to make higher (0.9) then reduce to a minimum
 % adjacency trace ???
-alpha = 0.35;      % learning rate
-gamma = 0.5;      % discount factor
+alpha = 0.2;      % learning rate
+gamma = 0.1;      % discount factor
 
 % state discritization
-discStateValsX = [0:1:180]*pi/180;       % [rad]
-discStateValsY = [-200:20:200]*pi/180;   % [rad/s]
-discStateValsZ = [-1:0.1:1];             % [m/s]
+discStateValsX = [0:3:180]*pi/180;       % [rad]
+discStateValsY = [-800:50:800]*pi/180;   % [rad/s]
+discStateValsZ = [-1:0.2:1];             % [m/s]
 nx = length(discStateValsX);
 ny = length(discStateValsY);
 nz = length(discStateValsZ);
@@ -42,7 +42,8 @@ uMax = 0.2;
 discActionVals = [-1 0 1]*uMax;
 
 % initialzie Q table randomly
-Q = zeros(nx*ny*nz,length(discActionVals)+1);
+%Q = zeros(nx*ny*nz,length(discActionVals)+1);
+Q = zeros(nx*ny*nz,length(discActionVals));
 % Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
 
 exploitExplore = [];
@@ -51,7 +52,7 @@ exploitExplore = [];
 for i = 1:nTrainTrials
     
     % discount epsilon
-    epsilon = 0.995*epsilon;
+    epsilon = 0.999*epsilon;
     
     % set epsilon to zero (greedy policy)
     if(i == nTrainTrials)
@@ -63,21 +64,14 @@ for i = 1:nTrainTrials
     if(i == nTrainTrials)
         X0 = [0 0 80*pi/180 0]'; % [m m/s rad rad/s]';
     else
-        X0 = [0; 0; (80+(randn()*10/1.96))*pi/180; 0];
+        X0 = [0; 0; (80+(randn()*10/1.96))*pi/180; ((randn()*200/1.96))*pi/180];
     end
     X = X0;
-    sim_mode = l2b_mode.wheelie;
-    
-    
-    % initial conditions X0 = [x0 xdot0]'
-    X0 = [0 0 80*pi/180 0]'; % [m m rad rad/s]'
-    X = X0;
-    sim_mode = l2b_mode.wheelie;
+    sim_mode = l2b_mode.wheelie; 
     
     % data storage: state at time t
     time        = t0;
     X_data      = X0;
-    energy_data = learn2bal_compute_energy(X,sysParams);  % compute initial total energy in system
     
     % data storage for discrete state info
     [stateNum,idxVec,dStates] = learn2bal_get_disc_state(X,discStateValsX,discStateValsY,discStateValsZ);
@@ -87,7 +81,7 @@ for i = 1:nTrainTrials
     % data storage: control effort and mode to transition from state at time t to state at time t+1
     % (last element of u_data will be null, last element of mode_data will be l2b_mode.complete)
     u_data      = [];
-    mode_data   = {str2mat(sprintf("%s",sim_mode))};
+    mode_data   = sim_mode;
     
     % run simulation
     for t = t0:dt:(tf-dt)
@@ -115,11 +109,11 @@ for i = 1:nTrainTrials
             % EXPLORE
             % choose an action at random
             exploitExplore(end+1) = 2;
-            aIdx = unidrnd(length(actionRewards)  -1  );  % NOTE: NOT ALLOWING SELECTION OF BRAKE LOCK!!!
+            aIdx = unidrnd(length(actionRewards));  % NOTE: NOT ALLOWING SELECTION OF BRAKE LOCK!!!
         end
         
         % compute appropriate control action
-        if(aIdx == length(actionRewards))
+        if(0 ) %aIdx == length(actionRewards))
             % LOCK WHEEL TO BODY
             % compute new state vector that conserves angular momentum
             % about ground contact point during "collision" when brake applied
@@ -151,28 +145,29 @@ for i = 1:nTrainTrials
         c= 0;
         
         % penalize being away from top
-        if( abs(pi/2 - X_current(3)) > 10*pi/180)
+        if( abs(pi/2 - X_current(3)) < 10*pi/180)
+            c = 500;
+        else
             c = -500;
         end
         
-        % penalize locking brakes
-        if(aIdx == 4)
-            c = c - 100;
-        end
+%         % penalize locking brakes
+%         if(aIdx == 4)
+%             c = c - 100;
+%         end
         
 %         % penalize wheel velocity
 %         if( abs(X_current(2)) > 0.1)
 %             c = -10;
 %         end
         
-        % penalize changing action
-        % comparison here doesn't work!!
+        % penalize changing modes and taking control action
         if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
-            c = c - 10;
+            c = c - 20;
         end
         
         % update Q table
-        Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(min(Q(stateNum_prime,:))));
+        Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(max(Q(stateNum_prime,:))));
         
         % update state
         X = X_prime;
@@ -183,14 +178,11 @@ for i = 1:nTrainTrials
         time(end+1)      = T(end);
         X_data(:,end+1)  = X;          % note: discarding state values at intermediate timesteps calculated by ode45()
         u_data(:,end+1)  = u_applied;
-        mode_data{end+1} = sprintf("%s",sim_mode);  % this is the mode at the END of the simulated timestep; i.e. mode used for NEXT propigation
-        energy_data(:,end+1)  = learn2bal_compute_energy(X,sysParams);
+        mode_data(end+1) = sim_mode;  % this is the mode at the END of the simulated timestep; i.e. mode used for NEXT propigation
         
         % data storage for discrete state info
         discStateN(end+1) = stateNum;
         discX(:,end+1) = dStates;
-        
-        % determine and store discrete state information
         
         % break out of loop if system crashes back to initial pendulum angle
         % TODO: handle this collision and return to drive mode...
@@ -202,7 +194,7 @@ for i = 1:nTrainTrials
     
     % add null control input and mode data for last state (not transitioning from last state...)
     u_data(end+1)    = 0;
-    mode_data{end}   = str2mat(sprintf("%s",l2b_mode.complete)); % overwrite...
+    mode_data(end)   = l2b_mode.complete; % overwrite...
     %      time(end)
 end
 
@@ -224,10 +216,19 @@ ylabel('Body Angular velocity [deg/s]');
 zlabel('Horizontal Speed [m/s]');
 colorbar
 hold on;
-plot3([90 90],[-220 220],[0.1 0.1],'r-','LineWidth',3);
-set(gca,'ZLim',[0.01 0.11])
+
+% set(gca,'ZLim',[0.01 0.21])
+% plot3([90 90],[-220 220],[0.2 0.2],'r-','LineWidth',3);
+
+set(gca,'ZLim',[-0.01 0.01])
+plot3([90 90],[-220 220],[0 0],'r-','LineWidth',3);
+
+% set(gca,'ZLim',[-0.41 -0.21])
+% plot3([90 90],[-220 220],[-0.4 -0.4],'r-','LineWidth',3);
+
+
 view([0 90])
 
 
 % save Q
-save('Q001.mat','Q')
+save('Q002.mat','Q')
