@@ -31,7 +31,7 @@ gamma = 0.6;      % discount factor
 lambda = 0.1;     % decay factor on eligibility traces
 
 % state discritization
-discStateValsX = [30:10:150]*pi/180;      % [rad]
+discStateValsX = [30:5:150]*pi/180;      % [rad]
 discStateValsY = [-800:100:800]*pi/180;   % [rad/s]
 discStateValsZ = [-1:0.2:1];             % [m/s]
 nx = length(discStateValsX);
@@ -163,10 +163,10 @@ for i = 1:nTrainTrials
 %             c = c - 100;
 %         end
         
-%         % penalize wheel velocity
-%         if( abs(X_current(2)) > 0.1)
-%             c = -10;
-%         end
+        % penalize wheel velocity
+        if( abs(X_current(2)) > 0.1)
+            c = -100;
+        end
         
 %         penalize changing modes and changing control action
         if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
@@ -240,4 +240,4 @@ view([0 90])
 
 
 % save Q
-% save('Q003.mat','Q')
+% save('Q004.mat','Q')
