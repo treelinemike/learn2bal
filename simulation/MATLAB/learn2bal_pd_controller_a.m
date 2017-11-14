@@ -16,9 +16,18 @@ omega_post = sqrt(2*sysParams.mp*9.81*sysParams.l_cm*(sin(theta_end)-sin(sysPara
 x_dot_crit = (Icombined*omega_post/B);       % [m/s]
 
 % initial conditions X0 = [x0 xdot0 theta0 thetadot0]'
-X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
+
+% X0 = [0 0 80*pi/180  0]'; % [m m rad rad/s]'
+% sim_mode = l2b_mode.free;
+
+% X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
+% sim_mode = l2b_mode.drive;
+
+X0 = [0 0 80*pi/180  0]'; % [m m rad rad/s]'
+sim_mode = l2b_mode.wheelie;
+
+
 X = X0;
-sim_mode = l2b_mode.drive;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time

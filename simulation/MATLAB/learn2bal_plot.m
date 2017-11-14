@@ -105,7 +105,12 @@ for i = 1:2
 end
 
 legPlots(end+1) = plot3(X_data(3,:),X_data(4,:),X_data(2,:),'-','LineWidth',3','Color',[ 0 0.7 0]);
-legend(legPlots,{'Wheelie Orbits','Endo Orbits','Manual Controller'});
+plot3(X_data(3,1),X_data(4,1),X_data(2,1),'o','MarkerSize',8,'MarkerFaceColor',[0 1 0],'MarkerEdgeColor',[0 0.7 0],'LineWidth',2);
+plot3(X_data(3,end),X_data(4,end),X_data(2,end),'o','MarkerSize',8,'MarkerFaceColor',[1 0 0],'MarkerEdgeColor',[0 0.7 0],'LineWidth',2);
+
+legend(legPlots,{'Wheelie Orbits','Endo Orbits','Actual Trajectory'});
+xlim([-0.05 1.8]);
+ylim([-20 20]);
 
 %% animate results
 figure;
