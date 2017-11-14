@@ -9,7 +9,7 @@ close all; clc; clear all;
 global discX; % share discrete state history with plotting function; TODO remove this, it is a hack
 
 % number of training trials
-nTrainTrials = 5000;
+nTrainTrials = 1000;
 
 % plotting options
 plotOpts.doSaveFrames = 0;
@@ -20,31 +20,36 @@ sysParams = learn2bal_get_params();
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
-tf = 1;                  % [s] simulation end time
+tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % learning parameters
 epsilon = 0.2;   % exploration vs. exploitation control  % may want to make higher (0.9) then reduce to a minimum
 % adjacency trace ???
-alpha = 0.2;      % learning rate
-gamma = 0.1;      % discount factor
+alpha = 0.6;      % learning rate
+gamma = 0.6;      % discount factor
+lambda = 0.1;     % decay factor on eligibility traces
 
 % state discritization
-discStateValsX = [0:3:180]*pi/180;       % [rad]
-discStateValsY = [-800:50:800]*pi/180;   % [rad/s]
+discStateValsX = [30:10:150]*pi/180;      % [rad]
+discStateValsY = [-800:100:800]*pi/180;   % [rad/s]
 discStateValsZ = [-1:0.2:1];             % [m/s]
 nx = length(discStateValsX);
 ny = length(discStateValsY);
 nz = length(discStateValsZ);
 
 % action discritization
-uMax = 0.2;
+uMax = 0.1;
 discActionVals = [-1 0 1]*uMax;
+% discActionVals = [-1 -0.2 0 0.2 1]*uMax;
 
 % initialzie Q table randomly
 %Q = zeros(nx*ny*nz,length(discActionVals)+1);
-Q = zeros(nx*ny*nz,length(discActionVals));
 % Q = unidrnd(2,nx*ny*nz,length(discActionVals)+1)-1;
+
+% Q = zeros(nx*ny*nz,length(discActionVals));
+Q = unidrnd(2,nx*ny*nz,length(discActionVals))-1;
+e = zeros(nx*ny*nz,length(discActionVals));
 
 exploitExplore = [];
 
@@ -54,7 +59,7 @@ for i = 1:nTrainTrials
     % discount epsilon
     epsilon = 0.999*epsilon;
     
-    % set epsilon to zero (greedy policy)
+    % set epsilon to zero (greedy policy) for test runs
     if(i == nTrainTrials)
         epsilon = 0;
     end
@@ -64,7 +69,8 @@ for i = 1:nTrainTrials
     if(i == nTrainTrials)
         X0 = [0 0 80*pi/180 0]'; % [m m/s rad rad/s]';
     else
-        X0 = [0; 0; (80+(randn()*10/1.96))*pi/180; ((randn()*200/1.96))*pi/180];
+        X0 = [0; 0; (90+(randn()*10/1.96))*pi/180; ((randn()*200/1.96))*pi/180];
+        X0*180/pi;
     end
     X = X0;
     sim_mode = l2b_mode.wheelie; 
@@ -145,10 +151,11 @@ for i = 1:nTrainTrials
         c= 0;
         
         % penalize being away from top
-        if( abs(pi/2 - X_current(3)) < 10*pi/180)
-            c = 500;
-        else
-            c = -500;
+%         if( abs(pi/2 - X_current(3)) < (5*pi/180))
+%             c = 5000;
+%         end
+        if( abs(pi/2 - X_current(3)) > (10*pi/180))
+            c = -500000;
         end
         
 %         % penalize locking brakes
@@ -161,13 +168,15 @@ for i = 1:nTrainTrials
 %             c = -10;
 %         end
         
-        % penalize changing modes and taking control action
+%         penalize changing modes and changing control action
         if( (sim_mode ~= mode_data(end)) || (~isempty(u_data) && (u ~= u_data(end))) )
-            c = c - 20;
+            c = c - 100;
         end
         
         % update Q table
-        Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(max(Q(stateNum_prime,:))));
+        if(i ~= nTrainTrials)
+            Q(stateNum,aIdx) = (1-alpha)*Q(stateNum,aIdx) + alpha*(c + gamma*(max(Q(stateNum_prime,:))));
+        end 
         
         % update state
         X = X_prime;
@@ -217,11 +226,11 @@ zlabel('Horizontal Speed [m/s]');
 colorbar
 hold on;
 
-% set(gca,'ZLim',[0.01 0.21])
-% plot3([90 90],[-220 220],[0.2 0.2],'r-','LineWidth',3);
+set(gca,'ZLim',[0.01 0.21])
+plot3([90 90],[-220 220],[0.2 0.2],'r-','LineWidth',3);
 
-set(gca,'ZLim',[-0.01 0.01])
-plot3([90 90],[-220 220],[0 0],'r-','LineWidth',3);
+% set(gca,'ZLim',[-0.01 0.01])
+% plot3([90 90],[-220 220],[0 0],'r-','LineWidth',3);
 
 % set(gca,'ZLim',[-0.41 -0.21])
 % plot3([90 90],[-220 220],[-0.4 -0.4],'r-','LineWidth',3);
@@ -231,4 +240,4 @@ view([0 90])
 
 
 % save Q
-save('Q002.mat','Q')
+% save('Q003.mat','Q')
