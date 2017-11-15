@@ -17,21 +17,24 @@ x_dot_crit = (Icombined*omega_post/B);       % [m/s]
 
 % initial conditions X0 = [x0 xdot0 theta0 thetadot0]'
 
-% X0 = [0 0 80*pi/180  0]'; % [m m rad rad/s]'
-% sim_mode = l2b_mode.free;
+% FREE MOTION FROM NEAR VERTICAL
+X0 = [0 0 80*pi/180  0]'; % [m m rad rad/s]'
+sim_mode = l2b_mode.free;
 
+% ACTIVE CONTROL FROM HORIZONTAL
 % X0 = [0 0 sysParams.theta0  0]'; % [m m rad rad/s]'
 % sim_mode = l2b_mode.drive;
 
-X0 = [0 0 80*pi/180  0]'; % [m m rad rad/s]'
-sim_mode = l2b_mode.wheelie;
+% ACTIVE CONTROL FROM NEAR VERTICAL
+% X0 = [0 0 80*pi/180  0]'; % [m m rad rad/s]'
+% sim_mode = l2b_mode.wheelie;
 
-
+% set current state to initial conditions
 X = X0;
 
 % simulation time parameters
 t0 = 0;                  % [s] simulation start time
-tf = 1.2;                  % [s] simulation end time
+tf = 2;                  % [s] simulation end time
 dt = 0.001;              % [s] timestep size
 
 % data storage: state at time t
@@ -95,7 +98,7 @@ for t = t0:dt:(tf-dt)
         case l2b_mode.wheelie
             
             % generate control input
-            Kd_x      =  2.7;        %1.5 7..... +0.8 ... negative??
+            Kd_x      =  2.7;        %1.5 7..... +0.8 ... would be negative if independent of other actions, empirically positive values promoste stability...
             Kp_theta  =  1.8;   %5.0 10 .... +5.0 ... positive
             Kd_theta  =  -0.25;   %-0.5 -2 .... -0.5 ... negative
             u         =  Kd_x*(x_dot) + Kp_theta*((pi/2)-theta) + Kd_theta*(theta_dot);  %+ Ki_x*(x_int)
